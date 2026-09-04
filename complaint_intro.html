@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Submit a Complaint</title>
+  <style>
+    body { margin:0; font-family: Arial, sans-serif; background:#f4f6fb; color:#111; }
+    .page { max-width:900px; margin:0 auto; padding:24px; }
+    .card { background:#fff; border:1px solid #d9dff0; border-radius:10px; padding:22px; box-shadow:0 10px 30px rgba(15,23,42,.08); }
+    h1 { margin-top:0; }
+    p { line-height:1.65; }
+    .button-row { display:flex; flex-wrap:wrap; gap:12px; margin-top:20px; }
+    .primary-button, .secondary-button { display:inline-block; padding:12px 18px; border-radius:8px; text-decoration:none; font-weight:700; }
+    .primary-button { background:#1976d2; color:#fff; }
+    .secondary-button { background:#f3f6fb; color:#1b3145; border:1px solid #d0d7e5; }
+    .info-box { background:#eef4ff; border-left:4px solid #1976d2; padding:14px 16px; margin-top:18px; border-radius:8px; }
+    .contact-list { margin:0; padding:0; list-style:none; }
+    .contact-list li { margin-bottom:10px; }
+    .contact-list a { color:#1976d2; text-decoration:none; }
+    .property-meta { margin:0 0 18px 0; padding:16px; background:#f8fbff; border:1px solid #dbe8ff; border-radius:8px; }
+    .property-meta div { margin-bottom:8px; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="card">
+      <h1>Submit a Complaint</h1>
+      <p>This website is not affiliated with the City of Savannah, Chatham County, or any government organization.</p>
+      <p>We can still help collect your complaint details here, keep them public for transparency, and try to submit the complaint on your behalf.  When the property is within the City of Savannah limits, please use the official complaint portal.</p>
+
+      <div id="propertyDetails" class="property-meta" aria-live="polite"></div>
+      <div id="message" class="info-box"></div>
+
+      <div class="button-row">
+        <a id="continueButton" class="primary-button" href="#">Continue to complaint form</a>
+        <a id="savingsButton" class="secondary-button" target="_blank" rel="noreferrer">External complaint form</a>
+        <a id="viewComplaints" class="secondary-button" href="complaints.php">View complaints</a>
+      </div>
+
+      <div id="countyInfo" class="info-box" style="display:none; margin-top:20px;"></div>
+
+      <div class="info-box" style="margin-top:20px;">
+        <strong>County resources</strong>
+        <ul class="contact-list">
+          <li>Chatham County Building Safety: <a href="tel:9122014300">(912) 201-4300</a></li>
+          <li>Non-emergency police number: <a href="tel:9126526500">(912) 652-6500</a></li>
+          <!-- <li>Email (Laurie Albert): <a href="mailto:laalbert@chathamcounty.org">laalbert@chathamcounty.org</a></li> -->
+          <li>Emergency: Dial <strong>911</strong></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const address = params.get('address') || '';
+    const unit = params.get('unit') || '';
+    const municipality = (params.get('municipality') || '').trim();
+    const hostName = params.get('host_name') || '';
+    const listingUrl = params.get('url') || '';
+    const rentalType = params.get('rental_type') || '';
+    const latitude = params.get('lat') || '';
+    const longitude = params.get('lng') || '';
+
+    const details = [];
+    if (rentalType) details.push(`<div><strong>Type:</strong> ${rentalType}</div>`);
+    if (hostName) details.push(`<div><strong>Host:</strong> ${hostName}</div>`);
+    if (municipality) details.push(`<div><strong>Municipality:</strong> ${municipality}</div>`);
+    if (address) details.push(`<div><strong>Address(approximate):</strong> ${address}${unit ? ' · Unit ' + unit : ''}</div>`);
+    if (listingUrl) details.push(`<div><strong>Listing:</strong> <a href="${listingUrl}" target="_blank" rel="noreferrer">${listingUrl}</a></div>`);
+
+    const propertyDetails = document.getElementById('propertyDetails');
+    propertyDetails.innerHTML = details.length ? details.join('') : '<div><strong>No property metadata available.</strong></div>';
+
+    const mainMessage = document.getElementById('message');
+    const countyInfo = document.getElementById('countyInfo');
+    const continueButton = document.getElementById('continueButton');
+    const savingsButton = document.getElementById('savingsButton');
+    const viewComplaints = document.getElementById('viewComplaints');
+
+    const queryString = new URLSearchParams();
+    if (address) queryString.set('address', address);
+    if (unit) queryString.set('unit', unit);
+    if (municipality) queryString.set('municipality', municipality);
+    if (hostName) queryString.set('host_name', hostName);
+    if (listingUrl) queryString.set('url', listingUrl);
+    if (rentalType) queryString.set('rental_type', rentalType);
+
+    // Use the same Google Form field mapping as the main map complaint button.
+    const complaintFormQuery = new URLSearchParams({ usp: 'pp_url' });
+    const now = new Date();
+    complaintFormQuery.set('entry.231361985', now.toISOString().slice(0, 10));
+    complaintFormQuery.set('entry.386457368', now.toTimeString().slice(0, 5));
+    if (address) complaintFormQuery.set('entry.743148639', address);
+    if (Number.isFinite(Number(latitude))) complaintFormQuery.set('entry.1753077861', Number(latitude).toFixed(7));
+    if (Number.isFinite(Number(longitude))) complaintFormQuery.set('entry.1569813902', Number(longitude).toFixed(7));
+    if (listingUrl) complaintFormQuery.set('entry.1841045190', listingUrl);
+    if (unit) complaintFormQuery.set('entry.1837968116', unit);
+    continueButton.href = 'https://docs.google.com/forms/d/e/1FAIpQLSfltlpYbYXLVyUJ7CwaIoTTaiGmAeuB2uA4mTYHwqwaIJki3w/viewform?' + complaintFormQuery.toString();
+    viewComplaints.href = 'complaints.php?' + queryString.toString();
+
+    // --- MUNICIPALITY CLASSIFICATION ---
+    const muni = municipality.toUpperCase();
+
+    const isSavannah = muni.includes('SAVANNAH');
+    const isTybee = muni.includes('TYBEE');
+    const isCounty =
+      muni.includes('UNINCORPORATED') ||
+      muni.includes('CHATHAM') ||
+      muni === '' ||
+      (!isSavannah && !isTybee);
+
+    // --- APPLY RULES ---
+    if (isSavannah) {
+      mainMessage.innerHTML =
+        '<strong>This appears to be in the City of Savannah.</strong> Savannah provides a public STR complaint portal. For emergencies, call 911.';
+
+      savingsButton.href = 'https://complaints-str.deckard.com/savannah-ga-str-complaints/';
+      savingsButton.textContent = 'Open Savannah complaint portal';
+      savingsButton.style.display = 'inline-block';
+
+      continueButton.style.display = 'none';
+      viewComplaints.style.display = 'none';
+      countyInfo.style.display = 'none';
+    }
+
+    else if (isTybee) {
+      mainMessage.innerHTML =
+        '<strong>This appears to be in Tybee Island.</strong> Tybee provides an official STR complaint portal. For emergencies call 911.';
+
+      // FIXED: Tybee now ONLY opens official portal
+      savingsButton.href = 'https://secure.hostcompliance.com/tybee-island-ga/complaints/type';
+      savingsButton.textContent = 'Open Tybee complaint portal';
+      savingsButton.style.display = 'inline-block';
+
+      // Hide your form — Tybee uses official only
+      continueButton.style.display = 'none';
+
+      // Hide view complaints — Tybee does not use your system
+      viewComplaints.style.display = 'none';
+
+      countyInfo.style.display = 'none';
+    }
+
+    else if (isCounty) {
+      mainMessage.innerHTML =
+        '<strong>This property appears to be in unincorporated Chatham County.</strong> A complaint portal may not be available. I recommend calling the non-emergency number or submitting here.';
+
+      savingsButton.style.display = 'none';
+
+      continueButton.textContent = 'Continue to unofficial complaint form';
+      continueButton.style.display = 'inline-block';
+
+      viewComplaints.style.display = 'inline-block';
+
+      countyInfo.style.display = 'block';
+      countyInfo.innerHTML =
+        '<strong>County notice:</strong> No STR complaint portal exists. Call Building Safety at (912) 201‑4300, email <a href="mailto:laalbert@chathamcounty.org">laalbert@chathamcounty.org</a>, or submit here.';
+    }
+
+    else {
+      mainMessage.innerHTML =
+        '<strong>This municipality does not have a known STR complaint portal.</strong> A complaint portal may not be available. I recommend calling the non-emergency number.';
+
+      savingsButton.style.display = 'none';
+      continueButton.style.display = 'none';
+      viewComplaints.style.display = 'none';
+      countyInfo.style.display = 'none';
+    }
+  </script>
+</body>
+</html>

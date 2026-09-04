@@ -1,0 +1,150 @@
+<?php
+// Read URL parameters safely
+$prefill_address = isset($_GET['address']) ? htmlspecialchars($_GET['address']) : '';
+$prefill_unit = isset($_GET['unit']) ? htmlspecialchars($_GET['unit']) : '';
+?>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Short-Term Rental Complaint</title>
+
+<style>
+    body {
+        font-family: Roboto, sans-serif;
+        background: #f5f5f5;
+        margin: 0;
+        padding: 0;
+    }
+    .container {
+        max-width: 800px;
+        margin: 30px auto;
+        background: white;
+        padding: 25px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    h1, h2 {
+        margin-top: 0;
+    }
+    label {
+        font-weight: 500;
+        margin-top: 15px;
+        display: block;
+    }
+    input[type="text"], input[type="email"], input[type="tel"], textarea {
+        width: 100%;
+        padding: 10px;
+        margin-top: 6px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+    textarea {
+        height: 120px;
+    }
+    .checkbox-group label {
+        display: block;
+        margin: 5px 0;
+    }
+    .submit-btn {
+        margin-top: 25px;
+        padding: 12px 20px;
+        background: #0066cc;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-size: 16px;
+        cursor: pointer;
+    }
+    .submit-btn:hover {
+        background: #004999;
+    }
+</style>
+
+</head>
+<body>
+
+<div class="container">
+    <img src="city_logo.png" alt="City Logo" style="max-width:120px;">
+    <h1>City of Savannah, GA</h1>
+    <h2>Short-Term Rental Complaint</h2>
+
+    <p>If this is an emergency, please contact 911.</p>
+    <p>Otherwise, please fill out the form below to file a complaint about a short-term rental property.</p>
+
+    <form id="complaintForm">
+
+        <label>What type of complaint(s) are you reporting? *</label>
+        <div class="checkbox-group">
+            <label><input type="checkbox" name="complaint[]" value="Noise"> Noise</label>
+            <label><input type="checkbox" name="complaint[]" value="Trash"> Trash</label>
+            <label><input type="checkbox" name="complaint[]" value="Parking"> Parking</label>
+            <label><input type="checkbox" name="complaint[]" value="Illegal Rental"> Illegal Rental</label>
+            <label><input type="checkbox" name="complaint[]" value="Number of Guests"> Number of Guests</label>
+            <label><input type="checkbox" name="complaint[]" value="Other"> Other</label>
+        </div>
+
+        <label>Address *</label>
+        <input type="text" id="address" name="address" required value="<?php echo $prefill_address; ?>">
+
+        <label>Apt or Unit #</label>
+        <input type="text" id="unit" name="unit" value="<?php echo $prefill_unit; ?>">
+
+        <label>Is this your first complaint about this property?</label>
+        <label><input type="radio" name="firstComplaint" value="Yes"> Yes</label>
+        <label><input type="radio" name="firstComplaint" value="No"> No</label>
+
+        <label>Complaint Description</label>
+        <textarea name="description" maxlength="2000"></textarea>
+
+        <h3>Your Contact Information (Required)</h3>
+
+        <label>First name *</label>
+        <input type="text" name="firstName" required>
+
+        <label>Last name</label>
+        <input type="text" name="lastName">
+
+        <label>Phone number *</label>
+        <input type="tel" name="phone" required>
+
+        <label>Email *</label>
+        <input type="email" name="email" required>
+
+        <h3>Optional Information</h3>
+
+        <label>Property owner's name</label>
+        <input type="text" name="ownerName">
+
+        <label>Short-term rental listing URL</label>
+        <input type="text" name="listingUrl">
+
+        <label><input type="checkbox" name="agree"> I agree to the Terms and Conditions</label>
+
+        <button type="submit" class="submit-btn">Submit Complaint</button>
+    </form>
+</div>
+
+<script>
+// Prevent submission for now
+document.getElementById("complaintForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+    alert("Feature coming soon!");
+});
+
+// Auto-fill from URL parameters (JS fallback)
+window.addEventListener("DOMContentLoaded", () => {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.has("address")) {
+        document.getElementById("address").value = params.get("address");
+    }
+    if (params.has("unit")) {
+        document.getElementById("unit").value = params.get("unit");
+    }
+});
+</script>
+
+</body>
+</html>

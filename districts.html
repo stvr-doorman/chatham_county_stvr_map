@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>STR Map - Commissioner Districts & Exclusions</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    body { background-color: #1e1e1e; color: white; margin: 0; font-family: Arial, sans-serif; }
+    h2 { padding: 10px; text-align: center; background-color: #222; margin: 0; color: #fff; }
+    #map { height: calc(100vh - 44px); width: 100%; }
+    .filter-panel {
+      background: white; color: #333; padding: 12px; border-radius: 6px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5); font-size: 13px; line-height: 1.5;
+      max-width: 250px; max-height: 80vh; overflow-y: auto;
+    }
+    .filter-title { font-weight: bold; margin-bottom: 6px; border-bottom: 2px solid #ddd; padding-bottom: 4px; font-size: 14px; }
+    .filter-section-title { font-weight: bold; margin: 8px 0 4px 0; color: #666; text-transform: uppercase; font-size: 11px; }
+    .filter-item { display: flex; align-items: center; cursor: pointer; font-weight: bold; margin-bottom: 4px; }
+    .filter-item input { margin-right: 8px; transform: scale(1.1); cursor: pointer; }
+    .map-pin {
+      color: white; border-radius: 50%; width: 32px; height: 32px;
+      text-align: center; line-height: 32px; font-weight: bold;
+      border: 2px solid #fff; box-shadow: 0 0 6px rgba(0,0,0,0.6);
+    }
+    .leaflet-popup-content { color: #111 !important; font-size: 13px; }
+    .popup-title { font-size: 14px; font-weight: bold; margin-bottom: 4px; }
+    .warning-text { color: #d32f2f; font-weight: bold; background: #ffebee; padding: 4px 6px; border-radius: 4px; margin: 4px 0; display: inline-block; }
+    .airbnb-link { display: block; margin-top: 10px; padding: 6px 12px; background-color: #ff5a5f; color: white !important; text-decoration: none !important; border-radius: 4px; font-weight: bold; text-align: center; }
+  </style>
+</head>
+<body>
+
+  <h2>Chatham County STR Tracker - Commissioner Districts</h2>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  
+  <script src="data_files/in_process_data/locations.js"></script>
+  <script src="data_files/in_process_data/boundaries.js"></script>
+
+  <script>
+    const map = L.map('map').setView([32.0485, -81.0087], 11);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // ---------------- NATIVE SVG PATTERN INJECTION ----------------
+    // This injects a clean diagonal cross-hatch definition straight into the map layer DOM
+    map.on('layeradd', function() {
+      const svg = document.querySelector('#map svg');
+      if (svg && !svg.querySelector('#diagonalHatch')) {
+        let defs = svg.querySelector('defs');
+        if (!defs) {
+          defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+          svg.insertBefore(defs, svg.firstChild);
+        }
+        const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+        pattern.setAttribute('id', 'diagonalHatch');
+        pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+        pattern.setAttribute('width', '10');
+        pattern.setAttribute('height', '10');
+        pattern.setAttribute('patternTransform', 'rotate(45)');
+        
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', '0');
+        line.setAttribute('y1', '0');
+        line.setAttribute('x2', '0');
+        line.setAttribute('y2', '10');
+        line.setAttribute('stroke', '#d32f2f');
+        line.setAttribute('stroke-width', '2');
+        
+        pattern.appendChild(line);
+        defs.appendChild(pattern);
+      }
+    });
+
+    // ---------------- DISTRICT COLOR PICKER FUNCTION ----------------
+    function getDistrictColor(unit) {
+      if (!unit) return '#969696';
+      const d = String(unit).trim();
+      switch (d) {
+        case '1': return '#3182bd';
+        case '2': return '#e6550d';
+        case '3': return '#31a354';
+        case '4': return '#756bb1';
+        case '5': return '#636363';
+        case '6': return '#fd8d3c';
+        case '7': return '#2ca25f';
+        case '8': return '#8856a7';
+        default:  return '#969696';
+      }
+    }
+
+    // ---------------- RENDER GEOGRAPHIC LAYERS ----------------
+    if (typeof geographicBoundaries !== 'undefined') {
+      
+      // First: Render District Color Coding background
+      if (geographicBoundaries.districts) {
+        L.geoJSON(geographicBoundaries.districts, {
+          style: function(feature) {
+            return {
+              fillColor: getDistrictColor(feature.properties.UNIT),
+              fillOpacity: 0.2,
+              color: '#444',
+              weight: 1.5
+            };
+          },
+          onEachFeature: function(feature, layer) {
+            layer.bindPopup(`<strong>Commissioner District:</strong> ${feature.properties.UNIT}<br/><strong>Representative:</strong> ${feature.properties.NAME || 'Unknown'}`);
+          }
+        }).addTo(map);
+      }
+
+      // Second: Overlay Savannah and Tybee cross-hatching right on top
+      if (geographicBoundaries.municipalities) {
+        L.geoJSON(geographicBoundaries.municipalities, {
+          style: function(feature) {
+            return {
+              fillColor: 'url(#diagonalHatch)',
+              fillOpacity: 0.5,
+              color: '#d32f2f',
+              weight: 2.5,
+              dashArray: '3, 5'
+            };
+          },
+          onEachFeature: function(feature, layer) {
+            layer.bindPopup(`<strong>Excluded Incorporated Jurisdiction:</strong> ${feature.properties.NAME}`);
+          }
+        }).addTo(map);
+      }
+    }
+
+    // ---------------- MAP POINTS CONTROLLER INTERACTION ----------------
+    let markerLayerGroup = L.layerGroup().addTo(map);
+    let activeFilters = { onlyViolations: false, allowedTypes: [] };
+
+    const uniqueTypes = [...new Set(locations.map(loc => loc.rental_type).filter(Boolean))].sort();
+    activeFilters.allowedTypes = [...uniqueTypes];
+
+    function renderMarkers() {
+      markerLayerGroup.clearLayers();
+
+      locations.forEach(function(loc) {
+        if (!loc.latitude || !loc.longitude) return;
+
+        const totalGuests = parseInt(loc.guests) || 0;
+        const totalBedrooms = parseInt(loc.bedrooms) || 0;
+        const maxAllowedGuests = totalBedrooms === 0 ? 2 : (totalBedrooms * 2) + 2;
+        const isOverCapacity = totalGuests > maxAllowedGuests;
+
+        if (activeFilters.onlyViolations && !isOverCapacity) return; 
+        if (!activeFilters.allowedTypes.includes(loc.rental_type)) return;
+
+        const markerColor = isOverCapacity ? "#d32f2f" : "#111111";
+        const pinIcon = L.divIcon({
+          className: 'custom-div-icon',
+          html: `<div class="map-pin" style="background-color: ${markerColor};">${totalGuests}</div>`,
+          iconSize: [32, 32],
+          iconAnchor: [16, 16]
+        });
+
+        let occupancyWarningHtml = isOverCapacity ? 
+          `<div class="warning-text">⚠️ OVER CAPACITY BY ${totalGuests - maxAllowedGuests} GUESTS</div>` : "";
+
+        const popupTemplate = `
+          <div class="popup-title"><strong>Type:</strong> ${loc.rental_type}</div>
+          <strong>Address:</strong> ${loc.searched_full_address || 'Unknown Address'}<br/>
+          <strong>Host:</strong> ${loc.host_name || 'N/A'}<hr style="margin:6px 0; border:0; border-top:1px solid #ddd;"/>
+          <strong>Advertised Capacity:</strong> ${totalGuests} Guests<br/>
+          <strong>Legal Limit:</strong> Max ${maxAllowedGuests} guests
+          ${occupancyWarningHtml}
+          <a class="airbnb-link" href="${loc.url}" target="_blank">View Listing</a>
+        `;
+
+        const newMarker = L.marker([Number(loc.latitude), Number(loc.longitude)], {icon: pinIcon})
+                           .bindPopup(popupTemplate);
+        markerLayerGroup.addLayer(newMarker);
+      });
+    }
+
+    renderMarkers();
+
+    // ---------------- CONTROLS DASHBOARD ----------------
+    const interfaceWidgetControl = L.control({ position: 'topright' });
+    interfaceWidgetControl.onAdd = function() {
+      const containerDiv = L.DomUtil.create('div', 'filter-panel');
+      L.DomEvent.disableClickPropagation(containerDiv);
+
+      let htmlContent = `
+        <div class="filter-title">Map Filters</div>
+        <div class="filter-section-title">Compliance</div>
+        <label class="filter-item"><input type="checkbox" id="complianceCheckbox">Show Violations Only</label>
+        <div class="filter-section-title">Property Types</div>
+      `;
+
+      uniqueTypes.forEach(type => {
+        htmlContent += `
+          <label class="filter-item">
+            <input type="checkbox" class="type-filter" value="${type}" checked> ${type}
+          </label>
+        `;
+      });
+
+      containerDiv.innerHTML = htmlContent;
+      return containerDiv;
+    };
+    interfaceWidgetControl.addTo(map);
+
+    document.getElementById('complianceCheckbox').addEventListener('change', function(e) {
+      activeFilters.onlyViolations = e.target.checked;
+      renderMarkers();
+    });
+
+    const typeCheckboxes = document.querySelectorAll('.type-filter');
+    typeCheckboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', function() {
+        const selectedTypes = [];
+        typeCheckboxes.forEach(cb => { if (cb.checked) selectedTypes.push(cb.value); });
+        activeFilters.allowedTypes = selectedTypes;
+        renderMarkers();
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>STVR Doorman - Chatham County Complaint Portal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://unpkg.com/maplibre-gl@3.6.0/dist/maplibre-gl.css" rel="stylesheet" />
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f7fb;
+      color: #222;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    header {
+      background: #1f2937;
+      color: #fff;
+      padding: 1rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      z-index: 10;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.25rem;
+    }
+    .header-controls {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .btn-about {
+      color: #9ca3af;
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.95rem;
+      /* display: flex; */
+      align-items: center;
+      gap: 0.3rem;
+      transition: color 0.2s;
+    }
+    .btn-about:hover {
+      color: #ffffff;
+    }
+    .btn-new-location {
+      background: #10b981;
+      color: #fff;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .btn-new-location:hover {
+      background: #059669;
+    }
+    .btn-new-location.active {
+      background: #dc2626;
+    }
+    .search-wrapper {
+      position: relative;
+      display: flex;
+      gap: 0.5rem;
+    }
+    .search-container {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .search-container input {
+      padding: 0.5rem;
+      font-size: 0.9rem;
+      border: 1px solid #4b5563;
+      border-radius: 4px;
+      width: 240px;
+    }
+    .search-container button {
+      padding: 0.5rem 1rem;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .search-container button:hover {
+      background: #1d4ed8;
+    }
+    /* Autocomplete dropdown styles */
+    #autocomplete-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 50px;
+      background: #fff;
+      border: 1px solid #d1d5db;
+      border-top: none;
+      border-radius: 0 0 4px 4px;
+      z-index: 1000;
+      max-height: 200px;
+      overflow-y: auto;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      display: none;
+    }
+    .autocomplete-item {
+      padding: 0.5rem;
+      font-size: 0.85rem;
+      color: #1f2937;
+      cursor: pointer;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .autocomplete-item:hover {
+      background: #f3f4f6;
+    }
+    .autocomplete-item.stvr-match {
+      font-weight: 600;
+      color: #2563eb;
+    }
+    #map {
+      flex: 1;
+      width: 100%;
+    }
+    #placementBanner {
+      display: none;
+      position: absolute;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1f2937;
+      color: #fff;
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      z-index: 100;
+      font-weight: 500;
+      font-size: 0.95rem;
+      text-align: center;
+    }
+
+    /* Custom Popup Styles - COMPACTIFIED */
+    .maplibregl-popup-content {
+      padding: 0.8rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      min-width: 250px;
+    }
+
+    /* BIG, mobile-friendly close button */
+    .maplibregl-popup-close-button {
+      font-size: 32px !important;
+      width: 44px !important;
+      height: 44px !important;
+      color: #4b5563 !important;
+      right: 2px !important;
+      top: 2px !important;
+      background-color: transparent !important;
+      border-radius: 50% !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      line-height: 1 !important;
+      transition: background-color 0.2s, color 0.2s;
+    }
+    .maplibregl-popup-close-button:hover {
+      background-color: #e5e7eb !important;
+      color: #111827 !important;
+    }
+    .maplibregl-popup-close-button:focus {
+      outline: none !important;
+    }
+
+    .popup-title {
+      font-weight: bold;
+      font-size: 1rem;
+      margin-bottom: 0.2rem;
+      color: #111827;
+      padding-right: 36px;
+    }
+    .popup-detail {
+      font-size: 0.85rem;
+      color: #4b5563;
+      margin-bottom: 0.2rem;
+    }
+    .popup-links {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      margin-bottom: 0.4rem;
+      border-top: 1px solid #e5e7eb;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 0.4rem 0;
+    }
+    .popup-link {
+      color: #2563eb;
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.85rem;
+    }
+    .popup-link:hover {
+      text-decoration: underline;
+    }
+    .popup-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+    .popup-btn {
+      display: block;
+      width: 100%;
+      text-align: center;
+      padding: 0.45rem;
+      border-radius: 4px;
+      text-decoration: none;
+      font-weight: 600;
+      box-sizing: border-box;
+      font-size: 0.85rem;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-complaint {
+      background: #dc2626;
+      color: #fff;
+    }
+    .btn-complaint:hover {
+      background: #b91c1c;
+    }
+    .btn-reposition {
+      background: #d97706;
+      color: #fff;
+    }
+    .btn-reposition:hover {
+      background: #b45309;
+    }
+    .btn-view {
+      background: #4b5563;
+      color: #fff;
+    }
+    .btn-view:hover {
+      background: #374151;
+    }
+    .btn-add-unit {
+      background: #2563eb;
+      color: #fff;
+      white-space: nowrap;
+    }
+    .btn-add-unit:hover {
+      background: #1d4ed8;
+    }
+
+    /* Multi-unit pagination footer inside popups */
+    .popup-pagination-container {
+      margin-top: 0.4rem;
+      padding-top: 0.4rem;
+      border-top: 1px solid #e5e7eb;
+    }
+    .popup-pagination {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #374151;
+    }
+    .popup-nav-btn {
+      background: #f3f4f6;
+      border: 1px solid #d1d5db;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      color: #1f2937;
+    }
+    .popup-nav-btn:hover:not(:disabled) {
+      background: #e5e7eb;
+    }
+    .popup-nav-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>STVR Doorman - Savannah Chatham County Area</h1>
+    <div class="header-controls">
+      <!-- <a href="index.html" class="btn-about">ℹ️ About</a> -->
+      <button id="newLocationBtn" class="btn-new-location">📍 Submit New Location</button>
+      <div class="search-wrapper">
+        <div class="search-container">
+          <input type="text" id="searchInput" placeholder="Search address in Chatham County..." autocomplete="off" />
+          <button id="searchBtn">Search</button>
+        </div>
+        <div id="autocomplete-list"></div>
+      </div>
+    </div>
+  </header>
+
+  <div id="placementBanner">Click anywhere on the map to place your new location marker!</div>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/maplibre-gl@3.6.0/dist/maplibre-gl.js"></script>
+  <script src="locations.js"></script>
+  <script>
+    // Configurable variable for auto-pan marker placement (0.25 = top 1/4 of the viewport)
+    const MARKER_TOP_RATIO = 0.15;
+
+    // Base Google Form prefill URL provided by user
+    // TODO: Replace with your own Google Form prefill URL if needed
+    // TODO: (2) add a unit number and url carry over to prefil more data into form if user clicked on a listing
+    // with a unit number 
+    // new url i going to be: 
+    const baseFormUrl = "https://docs.google.com/forms/d/e/1FAIpQLSfltlpYbYXLVyUJ7CwaIoTTaiGmAeuB2uA4mTYHwqwaIJki3w/viewform?usp=pp_url";
+
+    // Initialize Map centered over Chatham County, GA with zoom level 10
+    const map = new maplibregl.Map({
+      container: 'map',
+      style: 'https://tiles.openfreemap.org/styles/liberty',
+      center: [-81.15, 31.98],
+      zoom: 10
+    });
+
+    let isPlacementMode = false;
+    let activeMarker = null;
+    let activePopup = null;
+    let pendingData = null;
+    const markerRegistry = []; 
+    const TOTAL_PARCEL_PARTS = 10; 
+    let parcelIndexCache = []; 
+
+    function getCurrentDateTime() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      return {
+        date: `${year}-${month}-${day}`,
+        time: `${hours}:${minutes}`
+      };
+    }
+
+    function buildFormUrl(lat, lng, address, listingUrl = "", unitName = "") {
+      const dt = getCurrentDateTime();
+      const preciseLat = Number(lat).toFixed(7);
+      const preciseLng = Number(lng).toFixed(7);
+
+      let url = `${baseFormUrl}&entry.231361985=${encodeURIComponent(dt.date)}&entry.386457368=${encodeURIComponent(dt.time)}&entry.743148639=${encodeURIComponent(address)}&entry.1753077861=${encodeURIComponent(preciseLat)}&entry.1569813902=${encodeURIComponent(preciseLng)}`;
+      if (listingUrl) {
+        url += `&entry.999999999=${encodeURIComponent(listingUrl)}`;
+      }
+      if (unitName) {
+        url += `&entry.1837968116=${encodeURIComponent(unitName)}`;
+      }
+      return url;
+    }
+
+    // Helper to auto-pan map, keeping the target horizontally centered and vertically near the top
+    function flyToCenteredLocation(lng, lat, targetZoom = 18) {
+      const mapHeight = map.getContainer().clientHeight;
+      // Pad the bottom so the remaining vertical center hits the desired ratio (e.g., top 25%)
+      const bottomPadding = Math.max(0, mapHeight * (1 - (MARKER_TOP_RATIO * 2)));
+      
+      map.flyTo({
+        center: [lng, lat],
+        zoom: targetZoom,
+        speed: 1.2,
+        padding: { top: 0, bottom: bottomPadding, left: 0, right: 0 }
+      });
+    }
+
+    window.triggerComplaint = function(lat, lng, address, listingUrl, unitName) {
+      const finalUrl = buildFormUrl(lat, lng, address, listingUrl, unitName);
+      window.open(finalUrl, '_blank');
+    };
+
+    window.repositionLocation = function(lat, lng, address) {
+      const popups = document.getElementsByClassName('maplibregl-popup');
+      while (popups[0]) popups[0].remove();
+
+      flyToCenteredLocation(lng, lat, 18);
+
+      if (activeMarker) activeMarker.remove();
+      if (activePopup) activePopup.remove();
+
+      activeMarker = new maplibregl.Marker({ color: '#dc2626', draggable: true })
+        .setLngLat([lng, lat])
+        .addTo(map);
+
+      pendingData = {
+        lat: lat,
+        lng: lng,
+        address: address,
+        listingUrl: ""
+      };
+
+      createConfirmationPopup(lng, lat, `Repositioning: ${address}`);
+
+      activeMarker.on('dragstart', () => {
+        if (activePopup) {
+          activePopup.remove();
+          activePopup = null;
+        }
+      });
+
+      activeMarker.on('dragend', () => {
+        const newLngLat = activeMarker.getLngLat();
+        pendingData.lat = newLngLat.lat;
+        pendingData.lng = newLngLat.lng;
+        
+        createConfirmationPopup(newLngLat.lng, newLngLat.lat, 'Updating address from parcel layer...');
+        fetchAddressFromParcels(newLngLat.lng, newLngLat.lat, (updatedAddress) => {
+          pendingData.address = updatedAddress;
+          const existingReg = markerRegistry.find(m => m.address === updatedAddress.toUpperCase());
+          updatePopupText(`Parcel Address: ${updatedAddress.split(',')[0]}`, existingReg);
+        });
+      });
+    };
+
+    function getSubfolderPath(address, unitOrLicense) {
+      const cleanAddress = address.replace(/[^a-zA-Z0-9]/g, '_');
+      const cleanUnit = (unitOrLicense || 'main').replace(/[^a-zA-Z0-9]/g, '_');
+      return `./${cleanAddress}_${cleanUnit}/index.html`;
+    }
+
+    function generateMultiUnitPopupHtml(loc, unitIndex = 0) {
+      const units = (loc.units && loc.units.length > 0) ? loc.units : [{
+        unitName: loc.license || "Main Unit",
+        license: loc.license || "N/A",
+        vrboUrl: loc.vrboUrl || "#",
+        airbnbUrl: loc.airbnbUrl || "#",
+        viewComplaintsUrl: loc.viewComplaintsUrl || getSubfolderPath(loc.address, loc.license)
+      }];
+
+      const currentUnit = units[unitIndex];
+      const complaintsPath = currentUnit.viewComplaintsUrl || getSubfolderPath(loc.address, currentUnit.unitName);
+      
+      const displayTitle = currentUnit.unitName;
+      const shortAddress = loc.address.split(',')[0];
+
+      let html = `
+        <div class="popup-title">${displayTitle}</div>
+        <div class="popup-detail"><strong>Address:</strong> ${shortAddress}</div>
+        <div class="popup-detail"><strong>License #:</strong> ${currentUnit.license}</div>
+        
+        <div class="popup-links">
+          <a href="${currentUnit.vrboUrl}" target="_blank" class="popup-link">🔗 View VRBO Listing</a>
+          <a href="${currentUnit.airbnbUrl}" target="_blank" class="popup-link">🔗 View Airbnb Listing</a>
+        </div>
+
+        <div class="popup-actions">
+          <button class="popup-btn btn-complaint" onclick="triggerComplaint('${loc.lat}', '${loc.lng}', '${loc.address}', '${currentUnit.vrboUrl}', '${currentUnit.unitName}')">Submit Complaint Form</button>
+          <button class="popup-btn btn-reposition" onclick="repositionLocation(${loc.lat}, ${loc.lng}, '${loc.address}')">📍 Reposition / New Spot</button>
+          <a href="${complaintsPath}" target="_blank" class="popup-btn btn-view">View Existing Complaints</a>
+        </div>
+      `;
+
+      if (units.length > 1) {
+        html += `
+          <div class="popup-pagination-container">
+            <div class="popup-pagination">
+              <button class="popup-nav-btn" ${unitIndex === 0 ? 'disabled' : ''} onclick="switchPopupUnit('${loc.address}', ${unitIndex - 1})">◀ Prev Unit</button>
+              <span>Unit ${unitIndex + 1} of ${units.length}</span>
+              <button class="popup-nav-btn" ${unitIndex === units.length - 1 ? 'disabled' : ''} onclick="switchPopupUnit('${loc.address}', ${unitIndex + 1})">Next Unit ▶</button>
+            </div>
+          </div>
+        `;
+      }
+
+      html += `
+        <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #e5e7eb;">
+          <button class="popup-btn btn-add-unit" onclick="repositionLocation(${loc.lat}, ${loc.lng}, '${loc.address}')">Submit New Unit</button>
+        </div>
+      `;
+
+      return html;
+    }
+
+    window.switchPopupUnit = function(address, newIndex) {
+      const regItem = markerRegistry.find(m => m.address === address.toUpperCase());
+      if (regItem && regItem.popup) {
+        regItem.currentUnitIndex = newIndex;
+        regItem.popup.setHTML(generateMultiUnitPopupHtml(regItem.locationData, newIndex));
+      }
+    };
+
+    const newLocationBtn = document.getElementById('newLocationBtn');
+    const placementBanner = document.getElementById('placementBanner');
+    const searchInput = document.getElementById('searchInput');
+    const autocompleteList = document.getElementById('autocomplete-list');
+
+    map.on('load', () => {
+      for (let i = 1; i <= TOTAL_PARCEL_PARTS; i++) {
+        const partUrl = `media/geography_files/split_parcels/Parcel_Digest_2025_part${i}.geojson`;
+        
+        map.addSource(`parcels_part_${i}`, {
+          type: 'geojson',
+          data: partUrl
+        });
+
+        map.addLayer({
+          id: `parcel-fills-${i}`,
+          type: 'fill',
+          source: `parcels_part_${i}`,
+          minzoom: 14,
+          paint: {
+            'fill-color': '#3b82f6',
+            'fill-opacity': 0.1,
+            'fill-outline-color': '#1d4ed8'
+          }
+        });
+
+        fetch(partUrl)
+          .then(res => res.json())
+          .then(geojson => {
+            if (geojson && geojson.features) {
+              geojson.features.forEach(feature => {
+                const props = feature.properties;
+                if (props && props.PropAddress_Full) {
+                  const fullAddr = `${props.PropAddress_Full}, ${props.PropAddress_City || 'SAVANNAH'}, ${props.PropAddress_State || 'GA'} ${props.PropAddress_Zip || ''}`.trim();
+                  parcelIndexCache.push({
+                    address: fullAddr,
+                    geometry: feature.geometry
+                  });
+                }
+              });
+            }
+          }).catch(err => console.error("Error loading chunk index:", err));
+      }
+
+      // Read locations from imported locations.js, filtering duplicates by address string
+      const rawLocations = (typeof stvrLocations !== 'undefined') ? stvrLocations : [];
+      const seenAddresses = new Set();
+      const locationsToRender = [];
+
+      rawLocations.forEach(loc => {
+        const normalizedAddr = loc.address ? loc.address.trim().toUpperCase() : '';
+        if (normalizedAddr && !seenAddresses.has(normalizedAddr)) {
+          seenAddresses.add(normalizedAddr);
+          locationsToRender.push(loc);
+        }
+      });
+
+      locationsToRender.forEach(loc => {
+        const el = document.createElement('div');
+        el.style.width = '24px';
+        el.style.height = '24px';
+        el.style.backgroundColor = '#2563eb';
+        el.style.border = '2px solid #fff';
+        el.style.borderRadius = '50%';
+        el.style.cursor = 'pointer';
+
+        // autoPan false so we handle panning manually via flyToCenteredLocation
+        const popup = new maplibregl.Popup({ 
+          offset: 25, 
+          closeOnClick: true,
+          autoPan: false
+        });
+        
+        const registryEntry = {
+          address: loc.address.toUpperCase(),
+          lat: loc.lat,
+          lng: loc.lng,
+          locationData: loc,
+          currentUnitIndex: 0,
+          popup: popup,
+          marker: null
+        };
+
+        popup.setHTML(generateMultiUnitPopupHtml(loc, 0));
+
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (popup.isOpen()) {
+            popup.remove();
+          } else {
+            // Apply our custom auto-pan
+            flyToCenteredLocation(loc.lng, loc.lat, map.getZoom() > 14 ? map.getZoom() : 18);
+            marker.setPopup(popup).togglePopup();
+          }
+        });
+
+        const marker = new maplibregl.Marker({ element: el })
+          .setLngLat([loc.lng, loc.lat])
+          .addTo(map);
+
+        registryEntry.marker = marker;
+        markerRegistry.push(registryEntry);
+      });
+    });
+
+    newLocationBtn.addEventListener('click', () => {
+      isPlacementMode = !isPlacementMode;
+      if (isPlacementMode) {
+        newLocationBtn.textContent = '❌ Cancel Placement';
+        newLocationBtn.classList.add('active');
+        placementBanner.style.display = 'block';
+      } else {
+        exitPlacementMode();
+      }
+    });
+
+    function exitPlacementMode() {
+      isPlacementMode = false;
+      newLocationBtn.textContent = '📍 Submit New Location';
+      newLocationBtn.classList.remove('active');
+      placementBanner.style.display = 'none';
+    }
+
+    function fetchAddressFromParcels(lng, lat, callback) {
+      const point = map.project([lng, lat]);
+      const bbox = [
+        [point.x - 5, point.y - 5],
+        [point.x + 5, point.y + 5]
+      ];
+
+      const layerIds = Array.from({length: TOTAL_PARCEL_PARTS}, (_, i) => `parcel-fills-${i + 1}`);
+      const features = map.queryRenderedFeatures(bbox, { layers: layerIds });
+
+      if (features && features.length > 0) {
+        const props = features[0].properties;
+        if (props.PropAddress_Full) {
+          const city = props.PropAddress_City || 'SAVANNAH';
+          const state = props.PropAddress_State || 'GA';
+          const zip = props.PropAddress_Zip || '';
+          callback(`${props.PropAddress_Full}, ${city}, ${state} ${zip}`.trim());
+          return;
+        }
+      }
+
+      callback(`Chatham County Location (${lat.toFixed(6)}, ${lng.toFixed(6)})`);
+    }
+
+    function createConfirmationPopup(lng, lat, initialText, existingReg = null) {
+      if (activePopup) activePopup.remove();
+
+      const popupContent = document.createElement('div');
+      
+      if (existingReg) {
+        popupContent.innerHTML = `
+          <div class="popup-title">Location Already Exists!</div>
+          <div class="popup-detail" id="popupAddressText">Address: ${existingReg.locationData.address.split(',')[0]}</div>
+          <div style="font-size: 0.85rem; color: #4b5563; margin-bottom: 0.6rem;">
+            This address has ${existingReg.locationData.units ? existingReg.locationData.units.length : 1} unit(s).
+          </div>
+          <div class="popup-actions">
+            <button class="popup-btn btn-add-unit" id="popupAddUnitBtn">Submit New Unit</button>
+            <button class="popup-btn btn-view" id="popupCancelBtn" style="background:#e5e7eb; color:#374151;">Cancel</button>
+          </div>
+        `;
+      } else {
+        popupContent.innerHTML = `
+          <div class="popup-title">Confirm Location</div>
+          <div class="popup-detail" id="popupAddressText">${initialText}</div>
+          <div style="font-size: 0.8rem; color: #2563eb; margin-bottom: 0.4rem; font-weight: 500;">
+            💡 Tip: Drag marker or use Arrow keys to adjust!
+          </div>
+          <div class="popup-actions">
+            <button class="popup-btn btn-complaint" id="popupConfirmBtn">Confirm & Open Form</button>
+            <button class="popup-btn btn-view" id="popupCancelBtn" style="background:#e5e7eb; color:#374151;">Cancel</button>
+          </div>
+        `;
+      }
+
+      activePopup = new maplibregl.Popup({ 
+        offset: 25, 
+        closeOnClick: true,
+        autoPan: false
+      })
+        .setLngLat([lng, lat])
+        .setDOMContent(popupContent)
+        .addTo(map);
+
+      if (existingReg) {
+        document.getElementById('popupAddUnitBtn').addEventListener('click', () => {
+          cleanupActiveSession();
+          flyToCenteredLocation(existingReg.lng, existingReg.lat, 18);
+          existingReg.marker.setPopup(existingReg.popup).togglePopup();
+        });
+      } else {
+        document.getElementById('popupConfirmBtn').addEventListener('click', () => {
+          if (activeMarker && pendingData) {
+            const finalCoords = activeMarker.getLngLat();
+            const finalUrl = buildFormUrl(finalCoords.lat, finalCoords.lng, pendingData.address, pendingData.listingUrl || "");
+            window.open(finalUrl, '_blank');
+          }
+          cleanupActiveSession();
+        });
+      }
+
+      document.getElementById('popupCancelBtn').addEventListener('click', () => {
+        cleanupActiveSession();
+      });
+    }
+
+    function updatePopupText(newText, existingReg = null) {
+      if (existingReg) {
+        createConfirmationPopup(existingReg.lng, existingReg.lat, '', existingReg);
+      } else {
+        const textElem = document.getElementById('popupAddressText');
+        if (textElem) textElem.textContent = newText;
+        if (activeMarker && activePopup) {
+          activePopup.setLngLat(activeMarker.getLngLat());
+        }
+      }
+    }
+
+    function cleanupActiveSession() {
+      if (activeMarker) { activeMarker.remove(); activeMarker = null; }
+      if (activePopup) { activePopup.remove(); activePopup = null; }
+      pendingData = null;
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (!activeMarker) return;
+
+      const step = 0.00005; 
+      const currentLngLat = activeMarker.getLngLat();
+      let newLat = currentLngLat.lat;
+      let newLng = currentLngLat.lng;
+      let moved = false;
+
+      if (e.key === 'ArrowUp') { newLat += step; moved = true; }
+      else if (e.key === 'ArrowDown') { newLat -= step; moved = true; }
+      else if (e.key === 'ArrowLeft') { newLng -= step; moved = true; }
+      else if (e.key === 'ArrowRight') { newLng += step; moved = true; }
+
+      if (moved) {
+        e.preventDefault();
+        activeMarker.setLngLat([newLng, newLat]);
+        if (activePopup) {
+          activePopup.setLngLat([newLng, newLat]);
+        }
+        if (pendingData) {
+          pendingData.lat = newLat;
+          pendingData.lng = newLng;
+          fetchAddressFromParcels(newLng, newLat, (updatedAddress) => {
+            pendingData.address = updatedAddress;
+            const existingReg = markerRegistry.find(m => m.address === updatedAddress.toUpperCase());
+            updatePopupText(`Address: ${updatedAddress.split(',')[0]}`, existingReg);
+          });
+        }
+      }
+    });
+
+    function handleLocationPlacement(coords, forcedAddress = null) {
+      exitPlacementMode();
+
+      if (forcedAddress) {
+        const existingReg = markerRegistry.find(m => m.address === forcedAddress.toUpperCase() || forcedAddress.toUpperCase().includes(m.address));
+        if (existingReg) {
+          flyToCenteredLocation(existingReg.lng, existingReg.lat, 18);
+          existingReg.marker.setPopup(existingReg.popup).togglePopup();
+          return;
+        }
+      }
+
+      if (activeMarker) { activeMarker.remove(); activeMarker = null; }
+      if (activePopup) { activePopup.remove(); activePopup = null; }
+
+      flyToCenteredLocation(coords.lng, coords.lat, 18);
+
+      activeMarker = new maplibregl.Marker({ color: '#dc2626', draggable: true })
+        .setLngLat([coords.lng, coords.lat])
+        .addTo(map);
+
+      const initialText = forcedAddress ? `Address: ${forcedAddress.split(',')[0]}` : 'Querying local parcel data...';
+      const initialReg = forcedAddress ? markerRegistry.find(m => m.address === forcedAddress.toUpperCase()) : null;
+      
+      createConfirmationPopup(coords.lng, coords.lat, initialText, initialReg);
+
+      pendingData = {
+        lat: coords.lat,
+        lng: coords.lng,
+        address: forcedAddress || 'Querying...',
+        listingUrl: ""
+      };
+
+      if (!forcedAddress) {
+        setTimeout(() => {
+          fetchAddressFromParcels(coords.lng, coords.lat, (detectedAddress) => {
+            if (pendingData) {
+              pendingData.address = detectedAddress;
+              const existingReg = markerRegistry.find(m => m.address === detectedAddress.toUpperCase());
+              updatePopupText(`Address: ${detectedAddress.split(',')[0]}`, existingReg);
+            }
+          });
+        }, 400);
+      }
+
+      activeMarker.on('dragstart', () => {
+        if (activePopup) { activePopup.remove(); activePopup = null; }
+      });
+
+      activeMarker.on('dragend', () => {
+        const newLngLat = activeMarker.getLngLat();
+        pendingData.lat = newLngLat.lat;
+        pendingData.lng = newLngLat.lng;
+        
+        createConfirmationPopup(newLngLat.lng, newLngLat.lat, 'Updating address from parcel layer...');
+        fetchAddressFromParcels(newLngLat.lng, newLngLat.lat, (updatedAddress) => {
+          pendingData.address = updatedAddress;
+          const existingReg = markerRegistry.find(m => m.address === updatedAddress.toUpperCase());
+          updatePopupText(`Address: ${updatedAddress.split(',')[0]}`, existingReg);
+        });
+      });
+    }
+
+    map.on('click', (e) => {
+      if (!isPlacementMode) return;
+      handleLocationPlacement(e.lngLat);
+    });
+
+    let contextPopup = null;
+    map.on('contextmenu', (e) => {
+      e.preventDefault();
+      if (activePopup && activeMarker) return;
+
+      if (contextPopup) contextPopup.remove();
+
+      const coords = e.lngLat;
+      const menuContent = document.createElement('div');
+      menuContent.innerHTML = `
+        <div style="font-weight: bold; margin-bottom: 0.4rem; color: #111827;">Map Options</div>
+        <button class="popup-btn btn-complaint" id="ctxAddBtn" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">📍 Add New Location Here</button>
+      `;
+
+      contextPopup = new maplibregl.Popup({ 
+        offset: 15, 
+        closeOnClick: true,
+        autoPan: false 
+      })
+        .setLngLat([coords.lng, coords.lat])
+        .setDOMContent(menuContent)
+        .addTo(map);
+
+      document.getElementById('ctxAddBtn').addEventListener('click', () => {
+        contextPopup.remove();
+        contextPopup = null;
+        handleLocationPlacement(coords);
+      });
+    });
+
+    let touchTimer = null;
+    let touchCoords = null;
+
+    map.on('touchstart', (e) => {
+      if (e.originalEvent.touches.length === 1) {
+        touchCoords = e.lngLat;
+        touchTimer = setTimeout(() => {
+          if (touchCoords) {
+            handleLocationPlacement(touchCoords);
+            touchCoords = null;
+          }
+        }, 600);
+      }
+    });
+
+    map.on('touchmove', () => {
+      if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; touchCoords = null; }
+    });
+
+    map.on('touchend', () => {
+      if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; touchCoords = null; }
+    });
+
+    function getPolygonCentroid(geometry) {
+      let coords = geometry.coordinates;
+      let flatCoords = [];
+      
+      if (geometry.type === 'Polygon') {
+        flatCoords = coords[0];
+      } else if (geometry.type === 'MultiPolygon') {
+        flatCoords = coords[0][0];
+      } else {
+        return null;
+      }
+
+      let sumLng = 0;
+      let sumLat = 0;
+      let count = flatCoords.length;
+
+      for (let i = 0; i < count; i++) {
+        sumLng += flatCoords[i][0];
+        sumLat += flatCoords[i][1];
+      }
+
+      return { lng: sumLng / count, lat: sumLat / count };
+    }
+
+    searchInput.addEventListener('input', () => {
+      const query = searchInput.value.trim().toUpperCase();
+      autocompleteList.innerHTML = '';
+      
+      if (query.length < 3) {
+        autocompleteList.style.display = 'none';
+        return;
+      }
+
+      const stvrMatches = markerRegistry.filter(m => m.address.includes(query));
+      const parcelMatches = parcelIndexCache.filter(item => item.address.toUpperCase().includes(query)).slice(0, 6);
+
+      let totalResults = 0;
+
+      if (stvrMatches.length > 0) {
+        stvrMatches.forEach(match => {
+          totalResults++;
+          const div = document.createElement('div');
+          div.className = 'autocomplete-item stvr-match';
+          div.textContent = `⭐ [Registered STVR] ${match.address}`;
+          div.addEventListener('click', () => {
+            searchInput.value = match.address;
+            autocompleteList.style.display = 'none';
+            zoomToExistingMarker(match);
+          });
+          autocompleteList.appendChild(div);
+        });
+      }
+
+      if (parcelMatches.length > 0) {
+        parcelMatches.forEach(match => {
+          totalResults++;
+          const div = document.createElement('div');
+          div.className = 'autocomplete-item';
+          div.textContent = match.address;
+          div.addEventListener('click', () => {
+            searchInput.value = match.address;
+            autocompleteList.style.display = 'none';
+            const centroid = getPolygonCentroid(match.geometry);
+            if (centroid) {
+              handleLocationPlacement(centroid, match.address);
+            }
+          });
+          autocompleteList.appendChild(div);
+        });
+      }
+
+      if (totalResults > 0) {
+        autocompleteList.style.display = 'block';
+      } else {
+        autocompleteList.style.display = 'none';
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.search-wrapper')) {
+        autocompleteList.style.display = 'none';
+      }
+    });
+
+    document.getElementById('searchBtn').addEventListener('click', performSearch);
+    searchInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        autocompleteList.style.display = 'none';
+        performSearch();
+      }
+    });
+
+    function zoomToExistingMarker(stvrItem) {
+      exitPlacementMode();
+      if (activeMarker) { activeMarker.remove(); activeMarker = null; }
+      if (activePopup) { activePopup.remove(); activePopup = null; }
+
+      flyToCenteredLocation(stvrItem.lng, stvrItem.lat, 18);
+      stvrItem.marker.setPopup(stvrItem.popup).togglePopup();
+    }
+
+    function performSearch() {
+      const query = searchInput.value.trim().toUpperCase();
+      if (!query) return;
+
+      const existingStvr = markerRegistry.find(m => m.address === query || m.address.includes(query));
+      if (existingStvr) {
+        zoomToExistingMarker(existingStvr);
+        return;
+      }
+
+      const exactMatch = parcelIndexCache.find(item => item.address.toUpperCase() === query || item.address.toUpperCase().includes(query));
+      if (exactMatch) {
+        const centroid = getPolygonCentroid(exactMatch.geometry);
+        if (centroid) {
+          handleLocationPlacement(centroid, exactMatch.address);
+          return;
+        }
+      }
+
+      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchInput.value.trim() + ' Chatham County Georgia')}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data && data.length > 0) {
+            const lat = parseFloat(data[0].lat);
+            const lon = parseFloat(data[0].lon);
+            handleLocationPlacement({ lat: lat, lng: lon });
+          } else {
+            alert('Address not found in Chatham County.');
+          }
+        })
+        .catch(err => console.error('Search error:', err));
+    }
+  </script>
+</body>
+<footer>
+  <p>&copy; 2026 STVR Doorman. All rights reserved.<a href="index.html" class="btn-about">ℹ️ About</a></p>
+
+</footer>
+</html>
