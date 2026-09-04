@@ -1,0 +1,1756 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chatham County STVR Compliance Map</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link href="https://unpkg.com/maplibre-gl@3.6.0/dist/maplibre-gl.css" rel="stylesheet" />
+
+  <style>
+    body {
+      background-color: #1e1e1e;
+      color: white;
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    h2 {
+      padding: 10px;
+      text-align: center;
+      background-color: #222;
+      margin: 0;
+      color: #fff;
+    }
+    #map {
+      height: calc(100vh - 44px);
+      width: 100%;
+    }
+
+    .filter-panel {
+      position: absolute;
+      top: 65px;
+      left: 2px;
+      background: white;
+      color: #333;
+      padding: 12px;
+      border-radius: 6px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+      font-size: 14px;
+      line-height: 1.5;
+      z-index: 10;
+      width: 260px;
+      max-height: calc(100vh - 90px);
+      overflow-y: auto;
+      transition: max-height 0.25s ease, transform 0.25s ease;
+    }
+
+    .filter-panel.collapsed {
+      max-height: 46px;
+      overflow: hidden;
+    }
+
+    @media (max-width: 768px) {
+      .filter-panel {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        top: auto;
+        width: 100%;
+        max-height: 72vh;
+        border-radius: 14px 14px 0 0;
+        margin: 0;
+        box-shadow: 0 -10px 32px rgba(0,0,0,0.3);
+      }
+      .filter-header {
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .filter-title {
+        flex: 1 1 100%;
+      }
+      .filter-section-title {
+        margin-top: 10px;
+      }
+      .toggle-button {
+        width: 100%;
+        font-size: 14px;
+        padding: 10px 14px;
+        border-radius: 8px;
+      }
+      .filter-panel.collapsed {
+        max-height: 56px;
+      }
+    }
+
+    .filter-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 4px;
+    }
+
+    .filter-title {
+      font-weight: bold;
+    }
+
+    .filter-section-title {
+      font-size: 12px;
+      margin: 12px 0 6px;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .toggle-button {
+      background: #eee;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 6px 10px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    .toggle-button:hover {
+      background: #ddd;
+    }
+
+    .advanced-toggle {
+      width: 100%;
+      margin-top: 12px;
+      text-align: left;
+      font-weight: bold;
+    }
+
+    .advanced-filter-content {
+      display: none;
+      margin-top: 8px;
+      padding: 0 8px 4px;
+      border-left: 3px solid #1976d2;
+    }
+
+    .advanced-filter-content.expanded {
+      display: block;
+    }
+
+    .filter-item {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .filter-item input {
+      margin-right: 8px;
+      transform: scale(1.2);
+      cursor: pointer;
+    }
+
+    .slider-label {
+      font-weight: bold;
+      margin-top: 10px;
+      margin-bottom: 4px;
+    }
+
+    .reset-button {
+      margin-top: 12px;
+      width: 100%;
+      padding: 8px;
+      background: #1976d2;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-weight: bold;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .reset-button:hover {
+      background: #0d47a1;
+    }
+
+    .popup-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #000;
+      margin-bottom: 4px;
+    }
+
+    .popup-content {
+      color: #000;
+      font-size: 13px;
+    }
+
+    .maplibregl-popup-close-button {
+      width: 30px;
+      height: 30px;
+      font-size: 24px;
+      line-height: 26px;
+    }
+
+    .verified-section {
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px dashed #ccc;
+    }
+
+    .license-list {
+      max-height: 220px;
+      margin-top: 6px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+
+    .license-card {
+      padding: 7px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    .license-card:last-child {
+      border-bottom: 0;
+    }
+
+    .warning-text {
+      color: #d32f2f;
+      font-weight: bold;
+      background: #ffebee;
+      padding: 4px 6px;
+      border-radius: 4px;
+      margin: 4px 0;
+      display: inline-block;
+    }
+
+    .airbnb-link {
+      display: block;
+      margin-top: 10px;
+      padding: 6px 12px;
+      background-color: #ff5a5f;
+      color: white !important;
+      text-decoration: none !important;
+      border-radius: 4px;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    .action-link {
+      display: inline-block;
+      margin-top: 8px;
+      margin-right: 8px;
+      padding: 8px 12px;
+      background-color: #1976d2;
+      color: white !important;
+      text-decoration: none !important;
+      border-radius: 4px;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    .action-link.secondary {
+      background-color: #555;
+    }
+
+    .mobile-popup-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+    }
+    .mobile-popup-overlay.active {
+      display: flex;
+    }
+    .mobile-popup-card {
+      width: 100%;
+      max-width: 540px;
+      max-height: 94vh;
+      overflow: hidden;
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+      padding: 18px;
+      position: relative;
+    }
+    .mobile-popup-card .close-button {
+      position: absolute;
+      right: 14px;
+      top: 14px;
+      border: none;
+      background: rgba(255,255,255,0.95);
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      font-size: 24px;
+      line-height: 1;
+      cursor: pointer;
+      color: #333;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+    }
+    .mobile-popup-card .count-badge {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #1976d2;
+      color: #fff;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    @media (max-width: 768px) {
+      .mobile-popup-card {
+        width: calc(100% - 32px);
+        max-width: 100%;
+        max-height: 85vh;
+        height: auto;
+        border-radius: 16px;
+        padding: 18px 16px 22px;
+        margin: 0;
+        overflow: auto;
+      }
+      .mobile-popup-overlay {
+        align-items: center;
+        padding: 16px;
+      }
+      .mobile-popup-card .close-button {
+        right: 12px;
+        top: 12px;
+        width: 44px;
+        height: 44px;
+        font-size: 26px;
+      }
+    }
+
+    .filter-search {
+      width: 100%;
+      margin-top: 6px;
+      margin-bottom: 10px;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+
+    .property-search-wrapper {
+      position: relative;
+    }
+
+    .property-autocomplete-list {
+      position: absolute;
+      top: calc(100% - 10px);
+      left: 0;
+      right: 0;
+      z-index: 30;
+      display: none;
+      max-height: 240px;
+      overflow-y: auto;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+
+    .property-autocomplete-item {
+      padding: 8px;
+      color: #222;
+      cursor: pointer;
+      border-bottom: 1px solid #eee;
+    }
+
+    .property-autocomplete-item:hover {
+      background: #f2f6fc;
+    }
+
+    .property-autocomplete-item.listing-match {
+      color: #1557a0;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Chatham County STVR Compliance Map</h2>
+  <div id="map"></div>
+  <div id="mobilePopupOverlay" class="mobile-popup-overlay" role="dialog" aria-modal="true">
+    <div class="mobile-popup-card">
+      <button class="close-button" id="mobilePopupClose">×</button>
+      <div id="mobilePopupContent"></div>
+    </div>
+  </div>
+
+  <div class="filter-panel" id="filterPanel">
+    <div class="filter-header">
+      <div class="filter-title">Filters</div>
+      <button class="toggle-button" id="toggleFiltersBtn">Hide</button>
+    </div>
+
+    <div class="filter-section-title">Compliance</div>
+    <label class="filter-item">
+      <input type="checkbox" id="complianceCheckbox">
+      Show Violations Only (Beta, results may be inaccurate, some properties are grandfathered in at higher occupancy)
+    </label>
+    <label class="filter-item">
+      <input type="checkbox" id="verifiedLicenseCheckbox">
+      Verified license found (City of Savannah only)
+    </label>
+    <div class="filter-section-title">Search</div>
+    <div class="property-search-wrapper">
+      <input id="propertySearchInput" class="filter-search" type="search" placeholder="Listing, license, or any Chatham County address" autocomplete="off">
+      <div id="propertyAutocompleteList" class="property-autocomplete-list"></div>
+    </div>
+
+    <div class="filter-section-title">Municipalities</div>
+    <div id="totalCount" style="font-weight:bold;margin-bottom:6px">Total: 0</div>
+    <div id="municipalityCheckboxes"></div>
+
+    <div class="filter-section-title">Unincorporated County Scope</div>
+    <div class="slider-label">Municipal-edge buffer</div>
+    <input type="range" id="boundaryBufferSlider" min="0" max="1.24" value="0.62" step="0.01" style="width:100%;">
+    <div id="boundaryBufferValue">0.62 mi (1.0 km)</div>
+
+    <div class="filter-section-title">Licensed Location Coverage</div>
+    <label class="filter-item">
+      <input type="checkbox" id="licenseCoverageCheckbox" checked>
+      Show licensed-location coverage rings
+    </label>
+    <div class="slider-label">Coverage radius</div>
+    <input type="range" id="licenseRadiusSlider" min="0" max="1.24" value="0.62" step="0.01" style="width:100%;">
+    <div id="licenseRadiusValue">0.62 mi (1.0 km)</div>
+
+    <div class="slider-label">Min Over-Limit: (beta, some properties grandfatered in at higher rates)</div>
+    <input type="range" id="overLimitSlider" min="0" max="6" value="0" step="1" style="width:100%;">
+    <div id="overLimitValue">0 guests over</div>
+
+    <div class="slider-label">Min License Count:</div>
+    <input type="range" id="licenseCountSlider" min="1" max="3" value="1" step="1" style="width:100%;">
+    <div id="licenseCountValue">1 or more</div>
+
+    <button class="toggle-button advanced-toggle" id="advancedFiltersBtn" type="button" aria-expanded="false">
+      Advanced Filters ▸
+    </button>
+    <div class="advanced-filter-content" id="advancedFiltersContent">
+      <div class="slider-label">License Type</div>
+      <div id="licenseTypeCheckboxes"></div>
+      <div class="slider-label">Rental Type</div>
+      <div id="rentalTypeCheckboxes"></div>
+    </div>
+
+    <button class="reset-button" id="resetZoomBtn">Reset Zoom</button>
+  </div>
+
+  <script src="https://unpkg.com/maplibre-gl@3.6.0/dist/maplibre-gl.js"></script>
+  <script src="unincorporated_locations.js"></script>
+
+  <script>
+    // Precompute metrics
+    const processedLocations = locations.map(loc => {
+      const latitude = Number(loc.latitude);
+      const longitude = Number(loc.longitude);
+      const guests = Number(loc.guests) || 0;
+      const bedrooms = Number(loc.bedrooms) || 0;
+      const allowedGuests = Number(loc.allowed_guests);
+      const overOccupancy = Number(loc.over_occupancy);
+
+      let verifiedLicenseItems = [];
+      if (loc.verified_licenses) {
+        if (typeof loc.verified_licenses === "string") {
+          try {
+            verifiedLicenseItems = JSON.parse(loc.verified_licenses);
+          } catch (err) {
+            verifiedLicenseItems = [];
+          }
+        } else if (Array.isArray(loc.verified_licenses)) {
+          verifiedLicenseItems = loc.verified_licenses;
+        }
+      }
+
+      const isSavannah = String(loc.municipality || '').trim().toUpperCase() === 'SAVANNAH';
+      const permitOccupancy = isSavannah
+        ? verifiedLicenseItems.reduce((total, permit) => {
+            const occupancy = Number(permit && permit.max_occupancy);
+            return total + (Number.isFinite(occupancy) && occupancy > 0 ? occupancy : 0);
+          }, 0)
+        : 0;
+      const hasPermitOccupancy = permitOccupancy > 0;
+
+      if (!latitude || !longitude) return null;
+
+      const fallbackAllowedGuests = bedrooms === 0 ? 2 : (bedrooms * 2) + 2;
+      const maxAllowedGuests = hasPermitOccupancy
+        ? permitOccupancy
+        : (Number.isFinite(allowedGuests) ? allowedGuests : fallbackAllowedGuests);
+      const computedOverAmount = hasPermitOccupancy
+        ? guests - maxAllowedGuests
+        : (Number.isFinite(overOccupancy) ? overOccupancy : Math.max(0, guests - maxAllowedGuests));
+      const isOverCapacity = computedOverAmount > 0;
+      const overAmount = isOverCapacity ? computedOverAmount : 0;
+
+      const hasVerifiedLicense = Array.isArray(verifiedLicenseItems) && verifiedLicenseItems.length > 0;
+      const licenseCount = Array.isArray(verifiedLicenseItems) ? verifiedLicenseItems.length : 0;
+      // Search the complete source record, including every verified permit
+      // field (address, unit, permit number, agent, etc.).
+      const searchText = JSON.stringify(loc).toLowerCase().replace(/\s+/g, ' ');
+
+      return {
+        ...loc,
+        latitude,
+        longitude,
+        guests,
+        bedrooms,
+        maxAllowedGuests,
+        allowedGuests: maxAllowedGuests,
+        allowed_guests: maxAllowedGuests,
+        overOccupancy: computedOverAmount,
+        over_occupancy: computedOverAmount,
+        isOverCapacity,
+        overAmount,
+        hasVerifiedLicense,
+        licenseCount,
+        verifiedLicenseItems,
+        searchText
+      };
+    }).filter(Boolean);
+
+    // Separate listings that share an exact coordinate so every listing can
+    // be clicked directly, without opening a spiderfy view.
+    const coordinateGroups = new Map();
+    processedLocations.forEach(loc => {
+      const key = `${loc.longitude.toFixed(7)},${loc.latitude.toFixed(7)}`;
+      if (!coordinateGroups.has(key)) coordinateGroups.set(key, []);
+      coordinateGroups.get(key).push(loc);
+    });
+    coordinateGroups.forEach(group => {
+      const separationMeters = 8;
+      group.forEach((loc, index) => {
+        if (group.length === 1) {
+          loc.displayLongitude = loc.longitude;
+          loc.displayLatitude = loc.latitude;
+          return;
+        }
+        const angle = (2 * Math.PI * index) / group.length;
+        const latitudeOffset = (separationMeters * Math.sin(angle)) / 111320;
+        const longitudeOffset = (separationMeters * Math.cos(angle)) /
+          (111320 * Math.cos(loc.latitude * Math.PI / 180));
+        loc.displayLongitude = loc.longitude + longitudeOffset;
+        loc.displayLatitude = loc.latitude + latitudeOffset;
+      });
+    });
+
+    function openMobilePopup(html) {
+      const overlay = document.getElementById('mobilePopupOverlay');
+      const content = document.getElementById('mobilePopupContent');
+      if (!overlay || !content) return;
+      content.innerHTML = html;
+      overlay.classList.add('active');
+    }
+
+    function closeMobilePopup() {
+      const overlay = document.getElementById('mobilePopupOverlay');
+      const content = document.getElementById('mobilePopupContent');
+      if (!overlay || !content) return;
+      overlay.classList.remove('active');
+      content.innerHTML = '';
+    }
+
+    function toGeoJSON(data) {
+      return {
+        type: "FeatureCollection",
+        features: data.map(loc => ({
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: [loc.displayLongitude ?? loc.longitude, loc.displayLatitude ?? loc.latitude]
+          },
+          properties: loc
+        }))
+      };
+    }
+
+    function getGeometryCentroid(geometry) {
+      if (!geometry || !geometry.coordinates) return null;
+      const ring = geometry.type === 'Polygon'
+        ? geometry.coordinates[0]
+        : (geometry.type === 'MultiPolygon' ? geometry.coordinates[0][0] : null);
+      if (!ring || !ring.length) return null;
+      const totals = ring.reduce((sum, coordinate) => ({
+        longitude: sum.longitude + coordinate[0],
+        latitude: sum.latitude + coordinate[1]
+      }), { longitude: 0, latitude: 0 });
+      return { lng: totals.longitude / ring.length, lat: totals.latitude / ring.length };
+    }
+
+    function hidePropertyAutocomplete() {
+      const list = document.getElementById('propertyAutocompleteList');
+      list.innerHTML = '';
+      list.style.display = 'none';
+    }
+
+    function showParcelSearchResult(parcel) {
+      const centroid = getGeometryCentroid(parcel.geometry);
+      if (!centroid) return;
+      if (parcelSearchMarker) parcelSearchMarker.remove();
+      parcelSearchMarker = new maplibregl.Marker({ color: '#1976d2' })
+        .setLngLat(centroid)
+        .setPopup(new maplibregl.Popup({ closeButton: true, closeOnClick: true })
+          .setHTML(`<strong>Property address</strong><br/>${parcel.address}`))
+        .addTo(map);
+      map.flyTo({ center: centroid, zoom: 17, essential: true });
+      parcelSearchMarker.togglePopup();
+    }
+
+    function selectPropertySearchResult(result) {
+      document.getElementById('propertySearchInput').value = result.address;
+      hidePropertyAutocomplete();
+      applyFilters();
+      if (result.type === 'listing') {
+        map.flyTo({
+          center: [result.item.displayLongitude ?? result.item.longitude, result.item.displayLatitude ?? result.item.latitude],
+          zoom: 17,
+          essential: true
+        });
+      } else {
+        showParcelSearchResult(result.item);
+      }
+    }
+
+    function updatePropertyAutocomplete() {
+      const input = document.getElementById('propertySearchInput');
+      const list = document.getElementById('propertyAutocompleteList');
+      const query = input.value.trim().toLowerCase().replace(/\s+/g, ' ');
+      list.innerHTML = '';
+      if (query.length < 3) return hidePropertyAutocomplete();
+
+      const results = [
+        ...processedLocations.filter(loc => loc.searchText.includes(query)).slice(0, 6).map(item => ({
+          type: 'listing', item, address: item.address || item.approximate_address || 'Listing'
+        })),
+        ...parcelIndexCache.filter(parcel => parcel.searchAddress.includes(query)).slice(0, 6).map(item => ({
+          type: 'parcel', item, address: item.address
+        }))
+      ];
+
+      results.forEach(result => {
+        const option = document.createElement('div');
+        option.className = `property-autocomplete-item${result.type === 'listing' ? ' listing-match' : ''}`;
+        option.textContent = result.type === 'listing' ? `★ Listing: ${result.address}` : result.address;
+        option.addEventListener('click', () => selectPropertySearchResult(result));
+        list.appendChild(option);
+      });
+      list.style.display = results.length ? 'block' : 'none';
+    }
+
+    function performPropertySearch() {
+      const query = document.getElementById('propertySearchInput').value.trim().toLowerCase().replace(/\s+/g, ' ');
+      if (!query) return;
+      const listing = processedLocations.find(loc => loc.searchText.includes(query));
+      if (listing) return selectPropertySearchResult({
+        type: 'listing', item: listing, address: listing.address || listing.approximate_address || 'Listing'
+      });
+      const parcel = parcelIndexCache.find(item => item.searchAddress.includes(query));
+      if (parcel) selectPropertySearchResult({ type: 'parcel', item: parcel, address: parcel.address });
+    }
+
+    const defaultCenter = [-81.0087, 32.0485];
+    const defaultZoom = 12;
+    const TOTAL_PARCEL_PARTS = 9;
+    const parcelIndexCache = [];
+    let parcelSearchMarker = null;
+    const municipalityGeojsonUrl = "Municipality.geojson";
+    const excludedMunicipalities = new Set();
+    let municipalityNames = [];
+    const municipalityColors = {};
+    const activeMunicipalities = new Set();
+    const activeLicenseTypes = new Set();
+    const activeRentalTypes = new Set();
+    let availableLicenseTypes = [];
+    let availableRentalTypes = [];
+    let unincorporatedGeometry = null;
+    const licensedRowsByPin = new Map();
+    const licensedLocations = new Map();
+    let licensedRowsReady;
+
+    // Global bounds for reset zoom
+    let globalMinX = Infinity, globalMinY = Infinity, globalMaxX = -Infinity, globalMaxY = -Infinity;
+    processedLocations.forEach(loc => {
+      if (loc.longitude < globalMinX) globalMinX = loc.longitude;
+      if (loc.latitude < globalMinY) globalMinY = loc.latitude;
+      if (loc.longitude > globalMaxX) globalMaxX = loc.longitude;
+      if (loc.latitude > globalMaxY) globalMaxY = loc.latitude;
+    });
+
+    const map = new maplibregl.Map({
+      container: "map",
+      style: {
+        version: 8,
+        glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+        sources: {
+          "osm": {
+            type: "raster",
+            tiles: [
+              "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+            ],
+            tileSize: 256
+          }
+        },
+        layers: [
+          {
+            id: "osm",
+            type: "raster",
+            source: "osm"
+          }
+        ]
+      },
+      center: defaultCenter,
+      zoom: defaultZoom
+    });
+
+    // Smooth animation helper
+    function animateMap(targetCenter, targetZoom, duration = 900) {
+      const startZoom = map.getZoom();
+      const startCenter = map.getCenter();
+      const startTime = performance.now();
+
+      function frame(now) {
+        const t = Math.min((now - startTime) / duration, 1);
+        const eased = t * (2 - t);
+
+        const lng = startCenter.lng + (targetCenter[0] - startCenter.lng) * eased;
+        const lat = startCenter.lat + (targetCenter[1] - startCenter.lat) * eased;
+        const zoom = startZoom + (targetZoom - startZoom) * eased;
+
+        map.jumpTo({ center: [lng, lat], zoom });
+
+        if (t < 1) requestAnimationFrame(frame);
+      }
+
+      requestAnimationFrame(frame);
+    }
+
+    // Spiderfy helpers
+    const SPIDERFY_RADIUS = 7; // px
+    function clearSpiderfy() {
+      const src = map.getSource("spiderfy");
+      if (src) {
+        src.setData({ type: "FeatureCollection", features: [] });
+      }
+    }
+
+    function spiderfyFeatures(features, centerPoint) {
+      if (!features || features.length < 2) return;
+
+      const angleStep = (2 * Math.PI) / features.length;
+      const spiderFeatures = features.map((f, i) => {
+        const angle = i * angleStep;
+        const x = centerPoint.x + SPIDERFY_RADIUS * Math.cos(angle);
+        const y = centerPoint.y + SPIDERFY_RADIUS * Math.sin(angle);
+        const lngLat = map.unproject({ x, y });
+
+        return {
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: [lngLat.lng, lngLat.lat]
+          },
+          properties: f.properties
+        };
+      });
+
+      map.getSource("spiderfy").setData({
+        type: "FeatureCollection",
+        features: spiderFeatures
+      });
+    }
+
+    function normalizeMunicipalityName(name) {
+      return String(name || "").trim().toUpperCase();
+    }
+
+    function getMunicipalityColor(name) {
+      const normalized = normalizeMunicipalityName(name);
+      if (!normalized) return "#888";
+      if (normalized === "TYBEE ISLAND") return "#ff9800";
+      if (normalized === "THUNDERBOLT") return "#1976d2";
+      if (normalized === "UNINCORPORATED") return "#888888";
+
+      const hash = normalized.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      const hue = hash % 360;
+      return `hsl(${hue}, 70%, 55%)`;
+    }
+
+    function updateMunicipalityCheckboxes(names) {
+      const container = document.getElementById("municipalityCheckboxes");
+      container.innerHTML = "";
+      activeMunicipalities.clear();
+
+      // Compute counts from processedLocations
+      const counts = processedLocations.reduce((acc, loc) => {
+        const key = normalizeMunicipalityName(loc.municipality) || "UNINCORPORATED";
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {});
+
+      names.forEach(name => {
+        const label = document.createElement("label");
+        label.className = "filter-item";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = name;
+        checkbox.checked = true;
+        checkbox.addEventListener("change", () => {
+          if (checkbox.checked) activeMunicipalities.add(name);
+          else activeMunicipalities.delete(name);
+          applyFilters();
+        });
+
+        const colorSwatch = document.createElement("span");
+        colorSwatch.style.display = "inline-block";
+        colorSwatch.style.width = "12px";
+        colorSwatch.style.height = "12px";
+        colorSwatch.style.marginRight = "8px";
+        colorSwatch.style.borderRadius = "2px";
+        colorSwatch.style.backgroundColor = municipalityColors[name];
+
+        const count = counts[normalizeMunicipalityName(name)] || 0;
+        const nameNode = document.createTextNode(name);
+        const countSpan = document.createElement("span");
+        countSpan.className = "mun-count";
+        countSpan.style.marginLeft = "6px";
+        countSpan.textContent = ` (${count})`;
+
+        label.appendChild(checkbox);
+        label.appendChild(colorSwatch);
+        label.appendChild(nameNode);
+        label.appendChild(countSpan);
+        container.appendChild(label);
+
+        activeMunicipalities.add(name);
+      });
+    }
+
+    function updateAdvancedFilterCheckboxes() {
+      availableLicenseTypes = [...new Set(processedLocations.flatMap(loc =>
+        loc.verifiedLicenseItems
+          .map(license => license && license.owner_occupied)
+          .filter(Boolean)
+      ))].sort();
+      availableRentalTypes = [...new Set(processedLocations
+        .map(loc => loc.rental_type)
+        .filter(Boolean))].sort();
+
+      activeLicenseTypes.clear();
+      activeRentalTypes.clear();
+      availableLicenseTypes.forEach(type => activeLicenseTypes.add(type));
+      availableRentalTypes.forEach(type => activeRentalTypes.add(type));
+
+      const renderCheckboxes = (containerId, values, activeValues) => {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        values.forEach(value => {
+          const label = document.createElement('label');
+          label.className = 'filter-item';
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.value = value;
+          checkbox.checked = true;
+          checkbox.addEventListener('change', () => {
+            if (checkbox.checked) activeValues.add(value);
+            else activeValues.delete(value);
+            applyFilters();
+          });
+          label.appendChild(checkbox);
+          label.appendChild(document.createTextNode(value));
+          container.appendChild(label);
+        });
+      };
+
+      renderCheckboxes('licenseTypeCheckboxes', availableLicenseTypes, activeLicenseTypes);
+      renderCheckboxes('rentalTypeCheckboxes', availableRentalTypes, activeRentalTypes);
+    }
+
+    function matchesAdvancedFilters(loc) {
+      // All boxes checked means no constraint, so unverified listings remain visible.
+      if (activeLicenseTypes.size !== availableLicenseTypes.length) {
+        const matchesLicenseType = loc.verifiedLicenseItems.some(license =>
+          license && activeLicenseTypes.has(license.owner_occupied)
+        );
+        if (!matchesLicenseType) return false;
+      }
+      if (activeRentalTypes.size !== availableRentalTypes.length &&
+          !activeRentalTypes.has(loc.rental_type)) {
+        return false;
+      }
+      return true;
+    }
+
+    function updateMunicipalityCounts(filtered) {
+      // For checkbox counts we want them to reflect the current
+      // compliance and slider filters only (not municipality selections).
+      // Use the same effectiveMin logic as applyFilters so behavior matches.
+      const showViolationsOnly = document.getElementById("complianceCheckbox").checked;
+      const verifiedOnly = document.getElementById("verifiedLicenseCheckbox").checked;
+      const minOver = Number(document.getElementById("overLimitSlider").value) || 0;
+      const minLicenseCount = Number(document.getElementById("licenseCountSlider").value) || 1;
+      const searchTerm = document.getElementById("propertySearchInput").value.trim().toLowerCase().replace(/\s+/g, ' ');
+
+      let effectiveMin = null;
+      if (showViolationsOnly) {
+        effectiveMin = Math.max(1, minOver);
+      } else if (minOver > 0) {
+        effectiveMin = minOver;
+      } else {
+        effectiveMin = null; // no over-occupancy filter
+      }
+
+      const base = processedLocations.filter(loc => {
+        if (!loc) return false;
+        if (!isWithinCountyScope(loc)) return false;
+        if (effectiveMin !== null) {
+          const overVal = Number(loc.overOccupancy || 0);
+          if (overVal < effectiveMin) return false;
+        }
+        if (minLicenseCount > 1 && Number(loc.licenseCount || 0) < minLicenseCount) return false;
+        if (verifiedOnly && !loc.hasVerifiedLicense) return false;
+        if (!matchesAdvancedFilters(loc)) return false;
+        if (searchTerm && !loc.searchText.includes(searchTerm)) return false;
+        return true;
+      });
+
+      const counts = base.reduce((acc, loc) => {
+        const key = normalizeMunicipalityName(loc.municipality) || "UNINCORPORATED";
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {});
+
+      // Update total count display: show matching / grand total
+      const totalEl = document.getElementById('totalCount');
+      if (totalEl) totalEl.textContent = `Total: ${base.length} / ${processedLocations.length}`;
+
+      const container = document.getElementById("municipalityCheckboxes");
+      const labels = container.querySelectorAll(".filter-item");
+      labels.forEach(label => {
+        const checkbox = label.querySelector("input[type='checkbox']");
+        if (!checkbox) return;
+        const name = checkbox.value;
+        const countSpan = label.querySelector('.mun-count');
+        const c = counts[normalizeMunicipalityName(name)] || 0;
+        if (countSpan) countSpan.textContent = ` (${c})`;
+      });
+    }
+
+    function assignMunicipalities(municipalityGeojson) {
+      const polygonFeatures = municipalityGeojson.features.map(feature => ({
+        name: normalizeMunicipalityName(feature.properties.NAME),
+        polygon: feature
+      }));
+
+      processedLocations.forEach(loc => {
+        const lon = loc.longitude;
+        const lat = loc.latitude;
+        loc.municipality = "UNINCORPORATED";
+
+        for (const poly of polygonFeatures) {
+          const coordinates = poly.polygon.geometry.coordinates;
+          const inside = poly.polygon.geometry.type === "Polygon"
+            ? pointInPolygon([lon, lat], coordinates[0])
+            : coordinates.some(polygon => polygon.some(ring => pointInPolygon([lon, lat], ring)));
+
+          if (inside) {
+            loc.municipality = poly.name;
+            loc.municipalityColor = municipalityColors[poly.name] || "#000";
+            break;
+          }
+        }
+      });
+    }
+
+    function pointInPolygon(point, vs) {
+      const x = point[0];
+      const y = point[1];
+      let inside = false;
+      for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+        const xi = vs[i][0], yi = vs[i][1];
+        const xj = vs[j][0], yj = vs[j][1];
+        const intersect = ((yi > y) !== (yj > y)) &&
+          (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+
+    function pointInGeometry(point, geometry) {
+      if (!geometry) return false;
+      if (geometry.type === "Polygon") return pointInPolygon(point, geometry.coordinates[0]);
+      return geometry.coordinates.some(polygon => pointInPolygon(point, polygon[0]));
+    }
+
+    function distanceToUnincorporatedBoundaryMeters(point) {
+      if (!unincorporatedGeometry) return Infinity;
+      const rings = unincorporatedGeometry.type === "Polygon"
+        ? unincorporatedGeometry.coordinates
+        : unincorporatedGeometry.coordinates.flat();
+      const latitudeScale = 111132;
+      const longitudeScale = 111320 * Math.cos(point[1] * Math.PI / 180);
+      let minimumSquaredDistance = Infinity;
+      for (const ring of rings) {
+        for (let i = 0; i < ring.length - 1; i++) {
+          const [ax, ay] = [ring[i][0] * longitudeScale, ring[i][1] * latitudeScale];
+          const [bx, by] = [ring[i + 1][0] * longitudeScale, ring[i + 1][1] * latitudeScale];
+          const [px, py] = [point[0] * longitudeScale, point[1] * latitudeScale];
+          const dx = bx - ax;
+          const dy = by - ay;
+          const denominator = dx * dx + dy * dy;
+          const t = denominator ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / denominator)) : 0;
+          minimumSquaredDistance = Math.min(minimumSquaredDistance, (px - (ax + t * dx)) ** 2 + (py - (ay + t * dy)) ** 2);
+        }
+      }
+      return Math.sqrt(minimumSquaredDistance);
+    }
+
+    function setScopeMetadata(items) {
+      if (!unincorporatedGeometry) return;
+      items.forEach(item => {
+        const point = [Number(item.longitude), Number(item.latitude)];
+        item.insideUnincorporated = pointInGeometry(point, unincorporatedGeometry);
+        item.distanceToUnincorporatedMeters = item.insideUnincorporated ? 0 : distanceToUnincorporatedBoundaryMeters(point);
+      });
+    }
+
+    function milesToKmLabel(miles) {
+      return `${miles.toFixed(2)} mi (${(miles * 1.609344).toFixed(1)} km)`;
+    }
+
+    function getBoundaryBufferMeters() {
+      return Number(document.getElementById("boundaryBufferSlider").value) * 1609.344;
+    }
+
+    function isWithinCountyScope(item) {
+      return item.insideUnincorporated || Number(item.distanceToUnincorporatedMeters) <= getBoundaryBufferMeters();
+    }
+
+    function parseCsv(text) {
+      const rows = [];
+      let row = [];
+      let field = '';
+      let quoted = false;
+      for (let i = 0; i < text.length; i++) {
+        const character = text[i];
+        if (character === '"') {
+          if (quoted && text[i + 1] === '"') { field += '"'; i++; } else quoted = !quoted;
+        } else if (character === ',' && !quoted) {
+          row.push(field); field = '';
+        } else if ((character === '\n' || character === '\r') && !quoted) {
+          if (character === '\r' && text[i + 1] === '\n') i++;
+          row.push(field); field = '';
+          if (row.some(value => value !== '')) rows.push(row);
+          row = [];
+        } else field += character;
+      }
+      if (field || row.length) { row.push(field); rows.push(row); }
+      const [headers, ...values] = rows;
+      return values.map(valuesRow => Object.fromEntries(headers.map((header, index) => [header, valuesRow[index] || ''])));
+    }
+
+    function normalizePin(pin) {
+      return String(pin || '').toUpperCase().replace(/\s+/g, '');
+    }
+
+    async function loadLicensedRows() {
+      const response = await fetch('STR Renewal List.ChathamCounty.2026.matched.csv');
+      if (!response.ok) throw new Error(`License CSV request failed (${response.status})`);
+      parseCsv(await response.text()).forEach(row => {
+        const pin = normalizePin(row.Parcel_PIN);
+        if (!pin) return;
+        if (!licensedRowsByPin.has(pin)) licensedRowsByPin.set(pin, []);
+        licensedRowsByPin.get(pin).push(row);
+      });
+    }
+
+    function coordinatesForRadius(longitude, latitude, radiusMeters) {
+      const coordinates = [];
+      const earthRadius = 6371008.8;
+      const angularDistance = radiusMeters / earthRadius;
+      const latRadians = latitude * Math.PI / 180;
+      const lonRadians = longitude * Math.PI / 180;
+      for (let i = 0; i <= 48; i++) {
+        const bearing = (i / 48) * Math.PI * 2;
+        const ringLat = Math.asin(Math.sin(latRadians) * Math.cos(angularDistance) + Math.cos(latRadians) * Math.sin(angularDistance) * Math.cos(bearing));
+        const ringLon = lonRadians + Math.atan2(Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(latRadians), Math.cos(angularDistance) - Math.sin(latRadians) * Math.sin(ringLat));
+        coordinates.push([ringLon * 180 / Math.PI, ringLat * 180 / Math.PI]);
+      }
+      return coordinates;
+    }
+
+    function updateLicensedLocationLayers() {
+      const visibleLicenses = [...licensedLocations.values()].filter(isWithinCountyScope);
+      const radiusMeters = Number(document.getElementById('licenseRadiusSlider').value) * 1609.344;
+      const points = {
+        type: 'FeatureCollection',
+        features: visibleLicenses.map(license => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [license.longitude, license.latitude] }, properties: license }))
+      };
+      const coverage = {
+        type: 'FeatureCollection',
+        features: radiusMeters > 0 ? visibleLicenses.map(license => ({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [coordinatesForRadius(license.longitude, license.latitude, radiusMeters)] }, properties: license })) : []
+      };
+      map.getSource('licensed-locations')?.setData(points);
+      map.getSource('license-coverage')?.setData(coverage);
+      const visibility = document.getElementById('licenseCoverageCheckbox').checked ? 'visible' : 'none';
+      ['license-coverage-fill', 'license-coverage-outline', 'licensed-location-points'].forEach(id => {
+        if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', visibility);
+      });
+    }
+
+    map.on("load", () => {
+      licensedRowsReady = loadLicensedRows().catch(error => {
+        console.error('Failed to load licensed locations:', error);
+      });
+
+      map.addSource('license-coverage', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addSource('licensed-locations', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({
+        id: 'license-coverage-fill', type: 'fill', source: 'license-coverage',
+        paint: { 'fill-color': '#22c55e', 'fill-opacity': 0.16 }
+      });
+      map.addLayer({
+        id: 'license-coverage-outline', type: 'line', source: 'license-coverage',
+        paint: { 'line-color': '#16a34a', 'line-width': 1.25, 'line-opacity': 0.7 }
+      });
+      map.addLayer({
+        id: 'licensed-location-points', type: 'circle', source: 'licensed-locations',
+        paint: { 'circle-radius': 5, 'circle-color': '#16a34a', 'circle-opacity': 0.9, 'circle-stroke-width': 1.5, 'circle-stroke-color': '#ffffff' }
+      });
+
+      // Load the same split property files used by map_example.html.  They
+      // provide address suggestions and a parcel centroid for unmatched searches.
+      for (let i = 1; i <= TOTAL_PARCEL_PARTS; i++) {
+        const partUrl = `media/geography_files/split_parcels/Parcel_Digest_2025_part${i}.geojson`;
+        const sourceId = `parcel-addresses-${i}`;
+        map.addSource(sourceId, { type: 'geojson', data: partUrl });
+        map.addLayer({
+          id: `parcel-fills-${i}`,
+          type: 'fill',
+          source: sourceId,
+          minzoom: 14,
+          paint: {
+            'fill-color': '#3b82f6',
+            'fill-opacity': 0.035
+          }
+        });
+        map.addLayer({
+          id: `parcel-outlines-${i}`,
+          type: 'line',
+          source: sourceId,
+          minzoom: 14,
+          paint: {
+            'line-color': '#2563eb',
+            'line-width': 0.75,
+            'line-opacity': 0.28
+          }
+        });
+        fetch(partUrl)
+          .then(response => response.json())
+          .then(async geojson => {
+            await licensedRowsReady;
+            (geojson.features || []).forEach(feature => {
+              const properties = feature.properties;
+              if (!properties || !properties.PropAddress_Full) return;
+              const address = `${properties.PropAddress_Full}, ${properties.PropAddress_City || 'SAVANNAH'}, ${properties.PropAddress_State || 'GA'} ${properties.PropAddress_Zip || ''}`.trim();
+              parcelIndexCache.push({
+                address,
+                searchAddress: address.toLowerCase().replace(/\s+/g, ' '),
+                geometry: feature.geometry
+              });
+
+              const matchingLicenses = licensedRowsByPin.get(normalizePin(properties.PIN));
+              if (matchingLicenses) {
+                const centroid = getGeometryCentroid(feature.geometry);
+                if (centroid) {
+                  matchingLicenses.forEach(license => {
+                    const key = license['Business License Number'] || `${properties.PIN}-${license.Parcel_Matched_Address}`;
+                    licensedLocations.set(key, {
+                      ...license,
+                      longitude: centroid.lng,
+                      latitude: centroid.lat,
+                      licenseNumber: license['Business License Number'],
+                      matchedAddress: license.Parcel_Matched_Address
+                    });
+                  });
+                }
+              }
+            });
+            setScopeMetadata([...licensedLocations.values()]);
+            updateLicensedLocationLayers();
+            if (document.getElementById('propertySearchInput').value.trim().length >= 3) {
+              updatePropertyAutocomplete();
+            }
+          })
+          .catch(error => console.error(`Failed to load parcel address index part ${i}:`, error));
+      }
+
+      // Main source with clustering
+      map.addSource("strv", {
+        type: "geojson",
+        data: toGeoJSON(processedLocations),
+        cluster: true,
+        clusterRadius: 40,
+        clusterMaxZoom: 14
+      });
+
+      // Spiderfy source
+      map.addSource("spiderfy", {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] }
+      });
+
+      // Municipality boundaries
+      fetch(municipalityGeojsonUrl)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Municipality GeoJSON request failed (${response.status})`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          // Remove excluded features before the source is rendered. Otherwise
+          // they have no assigned color and MapLibre tries to parse null.
+          data.features = data.features.filter(feature =>
+            !excludedMunicipalities.has(normalizeMunicipalityName(feature.properties?.NAME))
+          );
+
+          data.features.forEach(feature => {
+            const name = normalizeMunicipalityName(feature.properties.NAME);
+            const color = getMunicipalityColor(name);
+            municipalityColors[name] = color;
+            feature.properties._fillColor = color;
+            feature.properties._lineColor = color;
+            municipalityNames.push(name);
+          });
+
+          unincorporatedGeometry = data.features.find(feature =>
+            normalizeMunicipalityName(feature.properties?.NAME) === 'UNINCORPORATED'
+          )?.geometry || null;
+          assignMunicipalities(data);
+          setScopeMetadata(processedLocations);
+          setScopeMetadata([...licensedLocations.values()]);
+          for (let i = processedLocations.length - 1; i >= 0; i--) {
+            if (excludedMunicipalities.has(normalizeMunicipalityName(processedLocations[i].municipality))) {
+              processedLocations.splice(i, 1);
+            }
+          }
+          municipalityNames.sort();
+          updateMunicipalityCheckboxes(municipalityNames);
+          updateAdvancedFilterCheckboxes();
+          map.getSource("strv").setData(toGeoJSON(processedLocations));
+          updateLicensedLocationLayers();
+          // Initialize counts (matching / grand total) on load
+          updateMunicipalityCounts(processedLocations);
+          // Apply the default 1 km county-edge buffer as soon as boundary data is ready.
+          applyFilters();
+
+          map.addSource("municipalities", {
+            type: "geojson",
+            data
+          });
+
+          const insertBefore = map.getLayer("clusters") ? "clusters" : undefined;
+
+          map.addLayer({
+            id: "municipality-fill",
+            type: "fill",
+            source: "municipalities",
+            paint: {
+              "fill-color": ["coalesce", ["get", "_fillColor"], "#888"],
+              "fill-opacity": 0.48,
+              "fill-antialias": true
+            },
+            layout: {
+              visibility: "visible"
+            }
+          }, insertBefore);
+
+          map.addLayer({
+            id: "municipality-outline",
+            type: "line",
+            source: "municipalities",
+            paint: {
+              "line-color": ["coalesce", ["get", "_lineColor"], "#555"],
+              "line-width": 3,
+              "line-opacity": 0.9
+            },
+            layout: {
+              visibility: "visible",
+              "line-join": "round",
+              "line-cap": "round"
+            }
+          }, insertBefore);
+        })
+        .catch(error => console.error("Failed to load municipality GeoJSON:", error));
+
+      // Cluster circles
+      map.addLayer({
+        id: "clusters",
+        type: "circle",
+        source: "strv",
+        filter: ["has", "point_count"],
+        paint: {
+          "circle-color": "#444",
+          "circle-radius": [
+            "step",
+            ["get", "point_count"],
+            18, 10,
+            22, 25,
+            28
+          ]
+        }
+      });
+
+      // Cluster count labels
+      map.addLayer({
+        id: "cluster-count",
+        type: "symbol",
+        source: "strv",
+        filter: ["has", "point_count"],
+        layout: {
+          "text-field": "{point_count}",
+          "text-size": 12,
+          "text-font": ["Noto Sans Regular"]
+        },
+        paint: {
+          "text-color": "#fff"
+        }
+      });
+
+      // Individual STVR circles
+      map.addLayer({
+        id: "strv-circles",
+        type: "circle",
+        source: "strv",
+        filter: ["!", ["has", "point_count"]],
+        paint: {
+          "circle-radius": 12,
+          "circle-color": [
+            "case",
+            ["get", "isOverCapacity"],
+            "#d32f2f",
+            "#388e3c"
+          ],
+          "circle-stroke-width": 2,
+          "circle-stroke-color": [
+            "coalesce",
+            ["get", "municipalityColor"],
+            "#000"
+          ]
+        }
+      });
+
+      // Labels for individual STVRs
+      map.addLayer({
+        id: "strv-labels",
+        type: "symbol",
+        source: "strv",
+        filter: ["!", ["has", "point_count"]],
+        layout: {
+          "text-field": [
+            "case",
+            ["get", "isOverCapacity"],
+            ["to-string", ["get", "overAmount"]],
+            ""
+          ],
+          "text-size": 12,
+          "text-font": ["Noto Sans Regular"],
+          "text-anchor": "center",
+          "text-justify": "center",
+          "text-allow-overlap": false,
+          "text-ignore-placement": false
+        },
+        paint: {
+          "text-color": "#000",
+          "text-halo-color": "#fff",
+          "text-halo-width": 0.8
+        }
+      });
+
+      // Spiderfy circles
+      map.addLayer({
+        id: "spiderfy-circles",
+        type: "circle",
+        source: "spiderfy",
+        paint: {
+          "circle-radius": 10,
+          "circle-color": [
+            "case",
+            ["get", "isOverCapacity"],
+            "#d32f2f",
+            "#388e3c"
+          ],
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#000"
+        }
+      });
+
+      // Spiderfy labels
+      map.addLayer({
+        id: "spiderfy-labels",
+        type: "symbol",
+        source: "spiderfy",
+        layout: {
+          "text-field": [
+            "case",
+            ["get", "isOverCapacity"],
+            ["to-string", ["get", "overAmount"]],
+            ""
+          ],
+          "text-size": 11,
+          "text-font": ["Noto Sans Regular"],
+          "text-anchor": "center",
+          "text-justify": "center",
+          "text-allow-overlap": false,
+          "text-ignore-placement": false
+        },
+        paint: {
+          "text-color": "#000",
+          "text-halo-color": "#fff",
+          "text-halo-width": 0.8
+        }
+      });
+
+// Popup + zoom for individual points (base layer)
+      map.on("click", "strv-circles", (e) => {
+        clearSpiderfy();
+
+        const loc = e.features[0].properties;
+        const excessive = loc.over_occupancy;
+        const warning = excessive > 0
+          ? `<div class="warning-text">⚠️ OVER CAPACITY BY ${excessive} GUESTS</div>`
+          : "";
+
+        // Parse verified licenses if available
+        let verifiedLicenses = [];
+        let fullVerifiedAddress = "";
+        try {
+          if (loc.verified_licenses) {
+            if (typeof loc.verified_licenses === "string") {
+              verifiedLicenses = JSON.parse(loc.verified_licenses);
+            } else if (Array.isArray(loc.verified_licenses)) {
+              verifiedLicenses = loc.verified_licenses;
+            }
+          }
+        } catch (err) {
+          console.error("Error parsing verified_licenses:", err);
+        }
+
+        // Build HTML for verified license details and address handling
+        let licenseHtml = "";
+        let addressHtml = "";
+
+        if (verifiedLicenses.length > 0) {
+          const v = verifiedLicenses[0];
+          // Construct full verified address including street and unit if present
+          fullVerifiedAddress = `${v.address || ''}${v.unit ? ' Unit ' + v.unit : ''}`.trim();
+          
+          if (fullVerifiedAddress) {
+            addressHtml = `<strong>Address:</strong> ${fullVerifiedAddress}<br/>`;
+          }
+
+          licenseHtml = `
+            <div class="verified-section">
+              <strong>✅ Verified Licenses (${verifiedLicenses.length}):</strong>
+              <div class="license-list">
+                ${verifiedLicenses.map((license, index) => `
+                  <div class="license-card">
+                    <strong>License ${index + 1}:</strong> ${license.permit_number || 'N/A'}<br/>
+                    <strong>Address:</strong> ${license.address || 'N/A'}${license.unit ? ` Unit ${license.unit}` : ''}<br/>
+                    <strong>Legal Limit:</strong> ${license.max_occupancy || 'N/A'}<br/>
+                    <strong>Owner Occupied:</strong> ${license.owner_occupied || 'N/A'}<br/>
+                    <strong>Historic District:</strong> ${license.historic_district || 'N/A'}<br/>
+                    <strong>Agent Name:</strong> ${license.agent_name || 'N/A'}
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        }
+
+        // Fall back to approx address only if there's no verified address available
+        if (!addressHtml && loc.approximate_address) {
+          addressHtml = `<strong>Approx Address:</strong> ${loc.approximate_address}<br/>`;
+        }
+
+        const complaintAddress = fullVerifiedAddress || loc.approximate_address || '';
+        const complaintIntroUrl = `complaint_intro.html?address=${encodeURIComponent(complaintAddress)}&unit=${encodeURIComponent(loc.unit || '')}&municipality=${encodeURIComponent(loc.municipality || '')}&host_name=${encodeURIComponent(loc.host_name || '')}&url=${encodeURIComponent(loc.url || '')}&rental_type=${encodeURIComponent(loc.rental_type || '')}`;
+        const complaintViewUrl = `complaints.php?address=${encodeURIComponent(complaintAddress)}&unit=${encodeURIComponent(loc.unit || '')}&municipality=${encodeURIComponent(loc.municipality || '')}`;
+
+        const html = `
+          <div class="popup-content">
+            <div class="popup-title">${loc.rental_type || 'Listing'}</div>
+            ${addressHtml}
+            <strong>Host:</strong> ${loc.host_name || 'N/A'}<br/>
+            ${loc.years_hosting ? `<small>(${loc.years_hosting} years hosting)</small><br/>` : ''}
+            <hr/>
+            <strong>Advertised Capacity:</strong> ${loc.guests || 'N/A'}<br/>
+            <strong>Bedrooms: </strong>${loc.bedrooms || 'N/A'}<br/>
+            <strong>Legal Limit:</strong> ${loc.allowed_guests || 'N/A'}<br/>
+            ${warning}
+            ${licenseHtml}
+            <hr/>
+            <a class="airbnb-link" href="${loc.url}" target="_blank">View Listing</a>
+            <a class="action-link" href="${complaintIntroUrl}" target="_blank">Submit a complaint</a>
+            <a class="action-link secondary" href="${complaintViewUrl}" target="_blank">View complaints</a>
+          </div>
+        `;
+
+        if (window.innerWidth <= 768) {
+          openMobilePopup(html);
+        } else {
+          new maplibregl.Popup({ closeButton: true, closeOnClick: true, maxWidth: '320px' })
+            .setLngLat(e.lngLat)
+            .setHTML(html)
+            .addTo(map);
+        }
+      });
+
+      // Popup + zoom for spiderfied points
+      map.on("click", "spiderfy-circles", (e) => {
+        const loc = e.features[0].properties;
+        const excessive = loc.overOccupancy;
+        const warning = excessive > 0
+          ? `<div class="warning-text">${excessive} GUESTS OVER LIMIT</div>`
+          : "";
+
+        let verifiedLicenses = [];
+        try {
+          verifiedLicenses = typeof loc.verified_licenses === 'string'
+            ? JSON.parse(loc.verified_licenses)
+            : (Array.isArray(loc.verified_licenses) ? loc.verified_licenses : []);
+        } catch (err) {
+          console.error("Error parsing verified_licenses:", err);
+        }
+        const licenseHtml = verifiedLicenses.length > 0 ? `
+          <div class="verified-section">
+            <strong>✅ Verified Licenses (${verifiedLicenses.length}):</strong>
+            <div class="license-list">
+              ${verifiedLicenses.map((license, index) => `
+                <div class="license-card">
+                  <strong>License ${index + 1}:</strong> ${license.permit_number || 'N/A'}<br/>
+                  <strong>Address:</strong> ${license.address || 'N/A'}${license.unit ? ` Unit ${license.unit}` : ''}<br/>
+                  <strong>Legal Limit:</strong> ${license.max_occupancy || 'N/A'}<br/>
+                  <strong>Owner Occupied:</strong> ${license.owner_occupied || 'N/A'}<br/>
+                  <strong>Historic District:</strong> ${license.historic_district || 'N/A'}<br/>
+                  <strong>Agent Name:</strong> ${license.agent_name || 'N/A'}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : '';
+
+        const complaintIntroUrl = `complaint_intro.html?address=${encodeURIComponent(loc.approximate_address || '')}&unit=${encodeURIComponent(loc.unit || '')}&municipality=${encodeURIComponent(loc.municipality || '')}&host_name=${encodeURIComponent(loc.host_name || '')}&url=${encodeURIComponent(loc.url || '')}&rental_type=${encodeURIComponent(loc.rental_type || '')}`;
+        const complaintViewUrl = `complaints.php?address=${encodeURIComponent(loc.approximate_address || '')}&unit=${encodeURIComponent(loc.unit || '')}&municipality=${encodeURIComponent(loc.municipality || '')}`;
+
+        const html = `
+          <div class="popup-content">
+            <div class="popup-title">${loc.rental_type}</div>
+            <strong>Approx Address:</strong> ${loc.approximate_address}<br/>
+            <strong>Host:</strong> ${loc.host_name}<hr/>
+            <strong>Advertised Capacity:</strong> ${loc.guests}<br/>
+            <strong>Bedrooms:</strong> ${loc.bedrooms}<br/>
+            <strong>Legal Limit:</strong> ${loc.allowedGuests}<br/>
+            ${warning}
+            ${licenseHtml}
+            <a class="airbnb-link" href="${loc.url}" target="_blank">View Listing</a>
+            <a class="action-link" href="${complaintIntroUrl}" target="_blank">Submit a complaint</a>
+            <a class="action-link secondary" href="${complaintViewUrl}" target="_blank">View complaints</a>
+          </div>
+        `;
+
+        if (window.innerWidth <= 768) {
+          openMobilePopup(html);
+        } else {
+          new maplibregl.Popup({ closeButton: true, closeOnClick: true, maxWidth: '320px' })
+            .setLngLat(e.lngLat)
+            .setHTML(html)
+            .addTo(map);
+        }
+      });
+
+      // Cluster click: zoom into cluster (no spiderfy unless max zoom & overlap handled via point clicks)
+      map.on("click", "clusters", (e) => {
+        clearSpiderfy();
+
+        const clusterId = e.features[0].properties.cluster_id;
+        const source = map.getSource("strv");
+
+        source.getClusterLeaves(clusterId, Infinity, 0, (err, leaves) => {
+          if (err || !leaves.length) return;
+
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+          leaves.forEach(f => {
+            const [x, y] = f.geometry.coordinates;
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (x > maxX) maxX = x;
+            if (y > maxY) maxY = y;
+          });
+
+          const center = [(minX + maxX) / 2, (minY + maxY) / 2];
+          const dx = maxX - minX;
+          const dy = maxY - minY;
+          const size = Math.max(dx, dy);
+          const zoom = Math.min(18, map.getZoom() + (size < 0.01 ? 3 : 2));
+
+          animateMap(center, zoom);
+        });
+      });
+
+    });
+
+    // Filtering logic
+    function applyFilters() {
+      const showViolationsOnly = document.getElementById("complianceCheckbox").checked;
+      const verifiedOnly = document.getElementById("verifiedLicenseCheckbox").checked;
+      const minOver = Number(document.getElementById("overLimitSlider").value);
+      const minLicenseCount = Number(document.getElementById("licenseCountSlider").value) || 1;
+      const searchTerm = document.getElementById("propertySearchInput").value.trim().toLowerCase().replace(/\s+/g, ' ');
+      const selectedMunicipalities = Array.from(activeMunicipalities.values());
+
+      // Effective minimum over-occupancy logic:
+      // - If "Show Violations Only" is checked, require at least 1 guest over (minimum 1).
+      // - If not checked and slider is 0, do not filter by over-occupancy (show all listings).
+      // - If not checked and slider > 0, apply the slider threshold.
+      let effectiveMin = null;
+      if (showViolationsOnly) {
+        effectiveMin = Math.max(1, minOver);
+      } else if (minOver > 0) {
+        effectiveMin = minOver;
+      } else {
+        effectiveMin = null; // no over-occupancy filter
+      }
+
+      const filtered = processedLocations.filter(loc => {
+        if (!isWithinCountyScope(loc)) return false;
+        if (!selectedMunicipalities.includes(loc.municipality)) return false;
+        if (effectiveMin !== null) {
+          const overVal = Number(loc.overOccupancy || 0);
+          if (overVal < effectiveMin) return false;
+        }
+        if (minLicenseCount > 1 && Number(loc.licenseCount || 0) < minLicenseCount) return false;
+        if (verifiedOnly && !loc.hasVerifiedLicense) return false;
+        if (!matchesAdvancedFilters(loc)) return false;
+        if (searchTerm && !loc.searchText.includes(searchTerm)) return false;
+        return true;
+      });
+
+      // Update listing source
+      clearSpiderfy();
+      const listingSource = map.getSource("strv");
+      if (listingSource) listingSource.setData(toGeoJSON(filtered));
+      updateLicensedLocationLayers();
+
+      // Update municipality counts based on filtered results
+      updateMunicipalityCounts(filtered);
+
+      // Update municipality visibility to only selected names
+      const filterExpression = selectedMunicipalities.length > 0
+        ? ["in", ["get", "NAME"], ["literal", selectedMunicipalities]]
+        : ["==", ["get", "NAME"], "__NONE__"];
+
+      if (map.getLayer("municipality-fill")) {
+        map.setFilter("municipality-fill", filterExpression);
+      }
+      if (map.getLayer("municipality-outline")) {
+        map.setFilter("municipality-outline", filterExpression);
+      }
+    }
+
+    document.getElementById("complianceCheckbox").addEventListener("change", applyFilters);
+    document.getElementById("verifiedLicenseCheckbox").addEventListener("change", applyFilters);
+    document.getElementById("propertySearchInput").addEventListener("input", () => {
+      applyFilters();
+      updatePropertyAutocomplete();
+    });
+    document.getElementById("propertySearchInput").addEventListener("keydown", event => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      hidePropertyAutocomplete();
+      performPropertySearch();
+    });
+    document.addEventListener('click', event => {
+      if (!event.target.closest('.property-search-wrapper')) hidePropertyAutocomplete();
+    });
+
+    document.getElementById("advancedFiltersBtn").addEventListener("click", () => {
+      const button = document.getElementById("advancedFiltersBtn");
+      const content = document.getElementById("advancedFiltersContent");
+      const expanded = content.classList.toggle("expanded");
+      button.setAttribute("aria-expanded", String(expanded));
+      button.textContent = `Advanced Filters ${expanded ? '▾' : '▸'}`;
+    });
+
+    document.getElementById("overLimitSlider").addEventListener("input", (e) => {
+      document.getElementById("overLimitValue").innerText = `${e.target.value} guests over`;
+      applyFilters();
+    });
+
+    document.getElementById("licenseCountSlider").addEventListener("input", (e) => {
+      const value = Number(e.target.value) || 1;
+      document.getElementById("licenseCountValue").innerText = `${value} or more`;
+      applyFilters();
+    });
+
+    document.getElementById("boundaryBufferSlider").addEventListener("input", (e) => {
+      document.getElementById("boundaryBufferValue").innerText = milesToKmLabel(Number(e.target.value));
+      applyFilters();
+    });
+
+    document.getElementById("licenseRadiusSlider").addEventListener("input", (e) => {
+      document.getElementById("licenseRadiusValue").innerText = milesToKmLabel(Number(e.target.value));
+      updateLicensedLocationLayers();
+    });
+
+    document.getElementById("licenseCoverageCheckbox").addEventListener("change", updateLicensedLocationLayers);
+
+    // Reset Zoom: fit all listings into viewport
+    document.getElementById("resetZoomBtn").addEventListener("click", () => {
+      clearSpiderfy();
+      map.fitBounds(
+        [[globalMinX, globalMinY], [globalMaxX, globalMaxY]],
+        { padding: 80, duration: 900, easing: t => t * (2 - t) }
+      );
+    });
+
+    const mobileClose = document.getElementById('mobilePopupClose');
+    if (mobileClose) {
+      mobileClose.addEventListener('click', closeMobilePopup);
+    }
+
+    const mobileOverlay = document.getElementById('mobilePopupOverlay');
+    if (mobileOverlay) {
+      mobileOverlay.addEventListener('click', (event) => {
+        if (event.target === mobileOverlay) {
+          closeMobilePopup();
+        }
+      });
+    }
+
+    const toggleBtn = document.getElementById('toggleFiltersBtn');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        const panel = document.getElementById('filterPanel');
+        if (!panel) return;
+        const collapsed = panel.classList.toggle('collapsed');
+        toggleBtn.textContent = collapsed ? 'Show' : 'Hide';
+        if (!collapsed) {
+          panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    }
+
+  </script>
+</body>
+</html>

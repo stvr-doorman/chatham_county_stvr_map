@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chatham County STVR Compliance Map</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+  <style>
+    body {
+      background-color: #1e1e1e;
+      color: white;
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    h2 {
+      padding: 10px;
+      text-align: center;
+      background-color: #222;
+      margin: 0;
+      color: #fff;
+    }
+    #map {
+      height: calc(100vh - 44px);
+      width: 100%;
+    }
+
+    .filter-panel {
+      background: white;
+      color: #333;
+      padding: 12px;
+      border-radius: 6px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .filter-title {
+      font-weight: bold;
+      margin-bottom: 6px;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 4px;
+    }
+    .filter-item {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .filter-item input {
+      margin-right: 8px;
+      transform: scale(1.2);
+      cursor: pointer;
+    }
+
+    .guest-label {
+      color: #fff;
+      font-weight: bold;
+      font-size: 12px;
+      text-shadow: 0 0 3px rgba(0,0,0,0.8);
+      background: transparent;
+      border: none;
+      box-shadow: none;
+    }
+
+    .leaflet-popup-content {
+      color: #111 !important;
+      font-size: 13px;
+    }
+    .popup-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #222;
+      margin-bottom: 4px;
+    }
+    .warning-text {
+      color: #d32f2f;
+      font-weight: bold;
+      background: #ffebee;
+      padding: 4px 6px;
+      border-radius: 4px;
+      margin: 4px 0;
+      display: inline-block;
+    }
+    .airbnb-link {
+      display: block;
+      margin-top: 10px;
+      padding: 6px 12px;
+      background-color: #ff5a5f;
+      color: white !important;
+      text-decoration: none !important;
+      border-radius: 4px;
+      font-weight: bold;
+      text-align: center;
+    }
+    .airbnb-link:hover {
+      background-color: #e0484d;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Chatham County STVR Compliance Map</h2>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="data_files/in_process_data/locations.js"></script>
+
+  <script>
+    // Precompute metrics
+    const processedLocations = (Array.isArray(locations) ? locations : []).map(loc => {
+      const latitude = Number(loc.latitude);
+      const longitude = Number(loc.longitude);
+      const guests = parseInt(loc.guests) || 0;
+      const bedrooms = parseInt(loc.bedrooms) || 0;
+
+      if (!latitude || !longitude) return null;
+
+      const baselineLimit = (bedrooms * 2) + 2;
+      const maxAllowedGuests = bedrooms === 0 ? 2 : baselineLimit;
+      const isOverCapacity = guests > maxAllowedGuests;
+
+      return {
+        ...loc,
+        latitude,
+        longitude,
+        guests,
+        bedrooms,
+        maxAllowedGuests,
+        isOverCapacity
+      };
+    }).filter(Boolean);
+
+    // Map center
+    const defaultCenter = [32.0485, -81.0087];
+    let mapCenter = defaultCenter;
+
+    if (processedLocations.length > 0) {
+      const avgLat = processedLocations.reduce((sum, loc) => sum + loc.latitude, 0) / processedLocations.length;
+      const avgLng = processedLocations.reduce((sum, loc) => sum + loc.longitude, 0) / processedLocations.length;
+      mapCenter = [avgLat, avgLng];
+    }
+
+    // Map init
+    const map = L.map('map', {
+      preferCanvas: true,
+      zoomAnimation: false,
+      markerZoomAnimation: false,
+      fadeAnimation: false
+    }).setView(mapCenter, 12);
+
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Marker layer
+    let markerLayerGroup = L.layerGroup().addTo(map);
+
+    function buildPopup(loc) {
+      let occupancyWarningHtml = "";
+      if (loc.isOverCapacity) {
+        const excessiveCount = loc.guests - loc.maxAllowedGuests;
+        occupancyWarningHtml = `<div class="warning-text">⚠️ OVER CAPACITY BY ${excessiveCount} GUESTS</div>`;
+      }
+
+      return `
+        <div class="popup-title">${loc.rental_type || 'Short Term Rental'}</div>
+        <strong>Approximate Address:</strong> ${loc.approximate_address || 'Unknown Address'}<br/>
+        <strong>Host:</strong> ${loc.host_name || 'N/A'}<hr style="margin:6px 0; border:0; border-top:1px solid #ddd;"/>
+
+        <strong>Advertised Capacity:</strong> ${loc.guests} Guests<br/>
+        <strong>Stated Bedrooms:</strong> ${loc.bedrooms}<br/>
+        <strong>Legal Limit:</strong> Max ${loc.maxAllowedGuests} guests
+        ${occupancyWarningHtml}
+        <a class="airbnb-link" href="${loc.url}" target="_blank">View Listing</a>
+      `;
+    }
+
+    function renderMarkers(filterOnlyViolations) {
+      markerLayerGroup.clearLayers();
+
+      processedLocations.forEach(loc => {
+        if (filterOnlyViolations && !loc.isOverCapacity) return;
+
+        const markerColor = loc.isOverCapacity ? "#d32f2f" : "#388e3c";
+
+        const marker = L.circleMarker([loc.latitude, loc.longitude], {
+          radius: 14,
+          weight: 2,
+          color: "#ffffff",
+          fillColor: markerColor,
+          fillOpacity: 1
+        }).bindPopup(buildPopup(loc));
+
+        marker.bindTooltip(String(loc.guests), {
+          permanent: true,
+          direction: 'center',
+          className: 'guest-label'
+        });
+
+        markerLayerGroup.addLayer(marker);
+      });
+    }
+
+    // Initial render
+    renderMarkers(false);
+
+    // Filter panel
+    const interfaceWidgetControl = L.control({ position: 'topright' });
+
+    interfaceWidgetControl.onAdd = function() {
+      const containerDiv = L.DomUtil.create('div', 'filter-panel');
+      L.DomEvent.disableClickPropagation(containerDiv);
+
+      containerDiv.innerHTML = `
+        <div class="filter-title">Compliance Filters</div>
+        <label class="filter-item">
+          <input type="checkbox" id="complianceCheckbox">
+          Show Violations Only
+        </label>
+      `;
+      return containerDiv;
+    };
+
+    interfaceWidgetControl.addTo(map);
+
+    // Filter handler
+    document.getElementById('complianceCheckbox').addEventListener('change', function(e) {
+      renderMarkers(e.target.checked);
+    });
+  </script>
+</body>
+</html>

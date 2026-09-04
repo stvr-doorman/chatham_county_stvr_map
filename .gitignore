@@ -1,0 +1,9 @@
+
+# Ignore giant parcel datasets
+data_files/parcels/Parcel_Digest_2025/
+data_files/parcels/
+
+# Ignore all parcel datasets
+data_files/parcels/
+data_files\parcels\Parcel_Digest_2025\Parcel_Digest_2025.geojson
+data_files\parcels\Parcel_Digest_2025\Parcel_Digest_2025.kml

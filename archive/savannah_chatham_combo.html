@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chatham County STVR Compliance Map</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link href="https://unpkg.com/maplibre-gl@3.6.0/dist/maplibre-gl.css" rel="stylesheet" />
+
+  <style>
+    body {
+      background-color: #1e1e1e;
+      color: white;
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    h2 {
+      padding: 10px;
+      text-align: center;
+      background-color: #222;
+      margin: 0;
+      color: #fff;
+    }
+    #map {
+      height: calc(100vh - 44px);
+      width: 100%;
+    }
+
+    .filter-panel {
+      position: absolute;
+      top: 65px;
+      right: 2px;
+      background: white;
+      color: #333;
+      padding: 12px;
+      border-radius: 6px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+      font-size: 14px;
+      line-height: 1.5;
+      z-index: 10;
+      width: 240px;
+    }
+
+    .filter-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 4px;
+    }
+
+    .filter-title {
+      font-weight: bold;
+    }
+
+    .filter-section-title {
+      font-size: 12px;
+      margin: 12px 0 6px;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .toggle-button {
+      background: #eee;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .filter-item {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .filter-item input {
+      margin-right: 8px;
+      transform: scale(1.2);
+      cursor: pointer;
+    }
+
+    .slider-label {
+      font-weight: bold;
+      margin-top: 10px;
+      margin-bottom: 4px;
+    }
+
+    .reset-button {
+      margin-top: 12px;
+      width: 100%;
+      padding: 8px;
+      background: #1976d2;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-weight: bold;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .reset-button:hover {
+      background: #0d47a1;
+    }
+
+    .popup-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #000;
+      margin-bottom: 4px;
+    }
+
+    .popup-content {
+      color: #000;
+      font-size: 13px;
+    }
+
+    .warning-text {
+      color: #d32f2f;
+      font-weight: bold;
+      background: #ffebee;
+      padding: 4px 6px;
+      border-radius: 4px;
+      margin: 4px 0;
+      display: inline-block;
+    }
+
+    .airbnb-link {
+      display: block;
+      margin-top: 10px;
+      padding: 6px 12px;
+      background-color: #ff5a5f;
+      color: white !important;
+      text-decoration: none !important;
+      border-radius: 4px;
+      font-weight: bold;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Chatham County STVR Compliance Map</h2>
+  <div id="map"></div>
+
+  <div class="filter-panel" id="filterPanel">
+    <div class="filter-header">
+      <div class="filter-title">Filters</div>
+      <button class="toggle-button" id="toggleFiltersBtn">Hide</button>
+    </div>
+
+    <div class="filter-section-title">Compliance</div>
+    <label class="filter-item">
+      <input type="checkbox" id="complianceCheckbox">
+      Show Violations Only
+    </label>
+
+    <div class="filter-section-title">Municipalities</div>
+    <div id="municipalityCheckboxes"></div>
+
+    <div class="slider-label">Min Over-Limit:</div>
+    <input type="range" id="overLimitSlider" min="0" max="6" value="0" step="1" style="width:100%;">
+    <div id="overLimitValue">0 guests over</div>
+
+    <button class="reset-button" id="resetZoomBtn">Reset Zoom</button>
+  </div>
+
+  <script src="https://unpkg.com/maplibre-gl@3.6.0/dist/maplibre-gl.js"></script>
+  <script src="data_files/in_process_data/locations.js"></script>
+
+  <script>
+    // Precompute metrics
+    const processedLocations = locations.map(loc => {
+      const latitude = Number(loc.latitude);
+      const longitude = Number(loc.longitude);
+      const guests = Number(loc.guests) || 0;
+      const bedrooms = Number(loc.bedrooms) || 0;
+
+      if (!latitude || !longitude) return null;
+
+      const baselineLimit = (bedrooms * 2) + 2;
+      const maxAllowedGuests = bedrooms === 0 ? 2 : baselineLimit;
+      const isOverCapacity = guests > maxAllowedGuests;
+      const overAmount = isOverCapacity ? guests - maxAllowedGuests : 0;
+
+      return {
+        ...loc,
+        latitude,
+        longitude,
+        guests,
+        bedrooms,
+        maxAllowedGuests,
+        isOverCapacity,
+        overAmount: Number(overAmount)
+      };
+    }).filter(Boolean);
+
+    function toGeoJSON(data) {
+      return {
+        type: "FeatureCollection",
+        features: data.map(loc => ({
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: [loc.longitude, loc.latitude]
+          },
+          properties: loc
+        }))
+      };
+    }
+
+    const defaultCenter = [-81.0087, 32.0485];
+    const defaultZoom = 12;
+    const municipalityGeojsonUrl = "data_files/municipality/Municipality.geojson";
+    let municipalityNames = [];
+    const municipalityColors = {};
+    const activeMunicipalities = new Set();
+
+    // Global bounds for reset zoom
+    let globalMinX = Infinity, globalMinY = Infinity, globalMaxX = -Infinity, globalMaxY = -Infinity;
+    processedLocations.forEach(loc => {
+      if (loc.longitude < globalMinX) globalMinX = loc.longitude;
+      if (loc.latitude < globalMinY) globalMinY = loc.latitude;
+      if (loc.longitude > globalMaxX) globalMaxX = loc.longitude;
+      if (loc.latitude > globalMaxY) globalMaxY = loc.latitude;
+    });
+
+    const map = new maplibregl.Map({
+      container: "map",
+      style: {
+        version: 8,
+        glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+        sources: {
+          "osm": {
+            type: "raster",
+            tiles: [
+              "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+            ],
+            tileSize: 256
+          }
+        },
+        layers: [
+          {
+            id: "osm",
+            type: "raster",
+            source: "osm"
+          }
+        ]
+      },
+      center: defaultCenter,
+      zoom: defaultZoom
+    });
+
+    // Smooth animation helper
+    function animateMap(targetCenter, targetZoom, duration = 900) {
+      const startZoom = map.getZoom();
+      const startCenter = map.getCenter();
+      const startTime = performance.now();
+
+      function frame(now) {
+        const t = Math.min((now - startTime) / duration, 1);
+        const eased = t * (2 - t);
+
+        const lng = startCenter.lng + (targetCenter[0] - startCenter.lng) * eased;
+        const lat = startCenter.lat + (targetCenter[1] - startCenter.lat) * eased;
+        const zoom = startZoom + (targetZoom - startZoom) * eased;
+
+        map.jumpTo({ center: [lng, lat], zoom });
+
+        if (t < 1) requestAnimationFrame(frame);
+      }
+
+      requestAnimationFrame(frame);
+    }
+
+    // Spiderfy helpers
+    const SPIDERFY_RADIUS = 70; // px
+    function clearSpiderfy() {
+      const src = map.getSource("spiderfy");
+      if (src) {
+        src.setData({ type: "FeatureCollection", features: [] });
+      }
+    }
+
+    function spiderfyFeatures(features, centerPoint) {
+      if (!features || features.length < 2) return;
+
+      const angleStep = (2 * Math.PI) / features.length;
+      const spiderFeatures = features.map((f, i) => {
+        const angle = i * angleStep;
+        const x = centerPoint.x + SPIDERFY_RADIUS * Math.cos(angle);
+        const y = centerPoint.y + SPIDERFY_RADIUS * Math.sin(angle);
+        const lngLat = map.unproject({ x, y });
+
+        return {
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: [lngLat.lng, lngLat.lat]
+          },
+          properties: f.properties
+        };
+      });
+
+      map.getSource("spiderfy").setData({
+        type: "FeatureCollection",
+        features: spiderFeatures
+      });
+    }
+
+    function normalizeMunicipalityName(name) {
+      return String(name || "").trim().toUpperCase();
+    }
+
+    function getMunicipalityColor(name) {
+      const normalized = normalizeMunicipalityName(name);
+      if (!normalized) return "#888";
+      if (normalized === "TYBEE ISLAND") return "#ff9800";
+      if (normalized === "THUNDERBOLT") return "#1976d2";
+      if (normalized === "UNINCORPORATED") return "#888888";
+
+      const hash = normalized.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      const hue = hash % 360;
+      return `hsl(${hue}, 70%, 55%)`;
+    }
+
+    function updateMunicipalityCheckboxes(names) {
+      const container = document.getElementById("municipalityCheckboxes");
+      container.innerHTML = "";
+      activeMunicipalities.clear();
+
+      names.forEach(name => {
+        const label = document.createElement("label");
+        label.className = "filter-item";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = name;
+        checkbox.checked = true;
+        checkbox.addEventListener("change", () => {
+          if (checkbox.checked) {
+            activeMunicipalities.add(name);
+          } else {
+            activeMunicipalities.delete(name);
+          }
+          applyFilters();
+        });
+
+        const colorSwatch = document.createElement("span");
+        colorSwatch.style.display = "inline-block";
+        colorSwatch.style.width = "12px";
+        colorSwatch.style.height = "12px";
+        colorSwatch.style.marginRight = "8px";
+        colorSwatch.style.borderRadius = "2px";
+        colorSwatch.style.backgroundColor = municipalityColors[name];
+
+        const text = document.createTextNode(name);
+
+        label.appendChild(checkbox);
+        label.appendChild(colorSwatch);
+        label.appendChild(text);
+        container.appendChild(label);
+
+        activeMunicipalities.add(name);
+      });
+    }
+
+    function assignMunicipalities(municipalityGeojson) {
+      const polygonFeatures = municipalityGeojson.features.map(feature => ({
+        name: normalizeMunicipalityName(feature.properties.NAME),
+        polygon: feature
+      }));
+
+      processedLocations.forEach(loc => {
+        const lon = loc.longitude;
+        const lat = loc.latitude;
+        loc.municipality = "UNINCORPORATED";
+
+        for (const poly of polygonFeatures) {
+          const coordinates = poly.polygon.geometry.coordinates;
+          const inside = poly.polygon.geometry.type === "Polygon"
+            ? pointInPolygon([lon, lat], coordinates[0])
+            : coordinates.some(polygon => polygon.some(ring => pointInPolygon([lon, lat], ring)));
+
+          if (inside) {
+            loc.municipality = poly.name;
+            loc.municipalityColor = municipalityColors[poly.name] || "#000";
+            break;
+          }
+        }
+      });
+    }
+
+    function pointInPolygon(point, vs) {
+      const x = point[0];
+      const y = point[1];
+      let inside = false;
+      for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+        const xi = vs[i][0], yi = vs[i][1];
+        const xj = vs[j][0], yj = vs[j][1];
+        const intersect = ((yi > y) !== (yj > y)) &&
+          (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+
+    map.on("load", () => {
+      // Main source with clustering
+      map.addSource("strv", {
+        type: "geojson",
+        data: toGeoJSON(processedLocations),
+        cluster: true,
+        clusterRadius: 40,
+        clusterMaxZoom: 14
+      });
+
+      // Spiderfy source
+      map.addSource("spiderfy", {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] }
+      });
+
+      // Municipality boundaries
+      fetch(municipalityGeojsonUrl)
+        .then(response => response.json())
+        .then(data => {
+          data.features.forEach(feature => {
+            const name = normalizeMunicipalityName(feature.properties.NAME);
+            const color = getMunicipalityColor(name);
+            municipalityColors[name] = color;
+            feature.properties._fillColor = color;
+            feature.properties._lineColor = color;
+            municipalityNames.push(name);
+          });
+
+          municipalityNames.sort();
+          updateMunicipalityCheckboxes(municipalityNames);
+          assignMunicipalities(data);
+
+          map.addSource("municipalities", {
+            type: "geojson",
+            data
+          });
+
+          const insertBefore = map.getLayer("clusters") ? "clusters" : undefined;
+
+          map.addLayer({
+            id: "municipality-fill",
+            type: "fill",
+            source: "municipalities",
+            paint: {
+              "fill-color": ["get", "_fillColor"],
+              "fill-opacity": 0.18,
+              "fill-antialias": true
+            },
+            layout: {
+              visibility: "visible"
+            }
+          }, insertBefore);
+
+          map.addLayer({
+            id: "municipality-outline",
+            type: "line",
+            source: "municipalities",
+            paint: {
+              "line-color": ["get", "_lineColor"],
+              "line-width": 3,
+              "line-opacity": 0.9,
+              "line-join": "round",
+              "line-cap": "round"
+            },
+            layout: {
+              visibility: "visible"
+            }
+          }, insertBefore);
+        })
+        .catch(error => console.error("Failed to load municipality GeoJSON:", error));
+
+      // Cluster circles
+      map.addLayer({
+        id: "clusters",
+        type: "circle",
+        source: "strv",
+        filter: ["has", "point_count"],
+        paint: {
+          "circle-color": "#444",
+          "circle-radius": [
+            "step",
+            ["get", "point_count"],
+            18, 10,
+            22, 25,
+            28
+          ]
+        }
+      });
+
+      // Cluster count labels
+      map.addLayer({
+        id: "cluster-count",
+        type: "symbol",
+        source: "strv",
+        filter: ["has", "point_count"],
+        layout: {
+          "text-field": "{point_count}",
+          "text-size": 12,
+          "text-font": ["Noto Sans Regular"]
+        },
+        paint: {
+          "text-color": "#fff"
+        }
+      });
+
+      // Individual STVR circles
+      map.addLayer({
+        id: "strv-circles",
+        type: "circle",
+        source: "strv",
+        filter: ["!", ["has", "point_count"]],
+        paint: {
+          "circle-radius": 12,
+          "circle-color": [
+            "case",
+            ["get", "isOverCapacity"],
+            "#d32f2f",
+            "#388e3c"
+          ],
+          "circle-stroke-width": 2,
+          "circle-stroke-color": [
+            "coalesce",
+            ["get", "municipalityColor"],
+            "#000"
+          ]
+        }
+      });
+
+      // Labels for individual STVRs
+      map.addLayer({
+        id: "strv-labels",
+        type: "symbol",
+        source: "strv",
+        filter: ["!", ["has", "point_count"]],
+        layout: {
+          "text-field": [
+            "case",
+            ["get", "isOverCapacity"],
+            ["to-string", ["get", "overAmount"]],
+            ""
+          ],
+          "text-size": 12,
+          "text-font": ["Noto Sans Regular"],
+          "text-anchor": "center",
+          "text-justify": "center",
+          "text-allow-overlap": false,
+          "text-ignore-placement": false
+        },
+        paint: {
+          "text-color": "#000",
+          "text-halo-color": "#fff",
+          "text-halo-width": 0.8
+        }
+      });
+
+      // Spiderfy circles
+      map.addLayer({
+        id: "spiderfy-circles",
+        type: "circle",
+        source: "spiderfy",
+        paint: {
+          "circle-radius": 10,
+          "circle-color": [
+            "case",
+            ["get", "isOverCapacity"],
+            "#d32f2f",
+            "#388e3c"
+          ],
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#000"
+        }
+      });
+
+      // Spiderfy labels
+      map.addLayer({
+        id: "spiderfy-labels",
+        type: "symbol",
+        source: "spiderfy",
+        layout: {
+          "text-field": [
+            "case",
+            ["get", "isOverCapacity"],
+            ["to-string", ["get", "overAmount"]],
+            ""
+          ],
+          "text-size": 11,
+          "text-font": ["Noto Sans Regular"],
+          "text-anchor": "center",
+          "text-justify": "center",
+          "text-allow-overlap": false,
+          "text-ignore-placement": false
+        },
+        paint: {
+          "text-color": "#000",
+          "text-halo-color": "#fff",
+          "text-halo-width": 0.8
+        }
+      });
+
+      // Popup + zoom for individual points (base layer)
+      map.on("click", "strv-circles", (e) => {
+        clearSpiderfy();
+
+        const loc = e.features[0].properties;
+        const excessive = loc.guests - loc.maxAllowedGuests;
+        const warning = excessive > 0
+          ? `<div class="warning-text">⚠️ OVER CAPACITY BY ${excessive} GUESTS</div>`
+          : "";
+
+        const html = `
+          <div class="popup-content">
+            <div class="popup-title">${loc.rental_type}</div>
+            <strong>Approx Address:</strong> ${loc.approximate_address}<br/>
+            <strong>Host:</strong> ${loc.host_name}<hr/>
+            <strong>Advertised Capacity:</strong> ${loc.guests}<br/>
+            <strong>Bedrooms: </strong>${loc.bedrooms}
+            <strong>Legal Limit:</strong> ${loc.maxAllowedGuests}<br/>
+            ${warning}
+            <a class="airbnb-link" href="${loc.url}" target="_blank">View Listing</a>
+          </div>
+        `;
+
+        new maplibregl.Popup()
+          .setLngLat(e.lngLat)
+          .setHTML(html)
+          .addTo(map);
+
+        const clickedCoord = e.features[0].geometry.coordinates;
+        const rendered = map.queryRenderedFeatures(e.point, { layers: ["strv-circles"] });
+
+        const sameSpot = rendered.filter(f => {
+          const c = f.geometry.coordinates;
+          return c[0] === clickedCoord[0] && c[1] === clickedCoord[1];
+        });
+
+        const zoom = map.getZoom();
+        const shouldSpiderfy =
+          sameSpot.length > 1 ||
+          (zoom >= 18 && rendered.length > 1);
+
+        if (shouldSpiderfy) {
+          const centerPoint = map.project(e.lngLat);
+          spiderfyFeatures(sameSpot, centerPoint);
+        } else {
+          animateMap(clickedCoord, Math.max(zoom, 15));
+        }
+      });
+
+      // Popup + zoom for spiderfied points
+      map.on("click", "spiderfy-circles", (e) => {
+        const loc = e.features[0].properties;
+        const excessive = loc.guests - loc.maxAllowedGuests;
+        const warning = excessive > 0
+          ? `<div class="warning-text">${excessive} GUESTS OVER LIMIT</div>`
+          : "";
+
+        const html = `
+          <div class="popup-content">
+            <div class="popup-title">${loc.rental_type}</div>
+            <strong>Approx Address:</strong> ${loc.approximate_address}<br/>
+            <strong>Host:</strong> ${loc.host_name}<hr/>
+            <strong>Advertised Capacity:</strong> ${loc.guests}<br/>
+            <strong>Bedrooms:</strong> ${loc.bedrooms}<br/>
+            <strong>Legal Limit:</strong> ${loc.maxAllowedGuests}<br/>
+            ${warning}
+            <a class="airbnb-link" href="${loc.url}" target="_blank">View Listing</a>
+          </div>
+        `;
+
+        new maplibregl.Popup()
+          .setLngLat(e.lngLat)
+          .setHTML(html)
+          .addTo(map);
+      });
+
+      // Cluster click: zoom into cluster (no spiderfy unless max zoom & overlap handled via point clicks)
+      map.on("click", "clusters", (e) => {
+        clearSpiderfy();
+
+        const clusterId = e.features[0].properties.cluster_id;
+        const source = map.getSource("strv");
+
+        source.getClusterLeaves(clusterId, Infinity, 0, (err, leaves) => {
+          if (err || !leaves.length) return;
+
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+          leaves.forEach(f => {
+            const [x, y] = f.geometry.coordinates;
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (x > maxX) maxX = x;
+            if (y > maxY) maxY = y;
+          });
+
+          const center = [(minX + maxX) / 2, (minY + maxY) / 2];
+          const dx = maxX - minX;
+          const dy = maxY - minY;
+          const size = Math.max(dx, dy);
+          const zoom = Math.min(18, map.getZoom() + (size < 0.01 ? 3 : 2));
+
+          animateMap(center, zoom);
+        });
+      });
+
+    });
+
+    // Filtering logic
+    function applyFilters() {
+      const showViolationsOnly = document.getElementById("complianceCheckbox").checked;
+      const minOver = Number(document.getElementById("overLimitSlider").value);
+      const selectedMunicipalities = Array.from(activeMunicipalities.values());
+
+      const filtered = processedLocations.filter(loc => {
+        if (!selectedMunicipalities.includes(loc.municipality)) return false;
+        if (showViolationsOnly && !loc.isOverCapacity) return false;
+        if (loc.overAmount < minOver) return false;
+        return true;
+      });
+
+      // Update listing source
+      clearSpiderfy();
+      map.getSource("strv").setData(toGeoJSON(filtered));
+
+      // Update municipality visibility to only selected names
+      const filterExpression = selectedMunicipalities.length > 0
+        ? ["in", ["get", "NAME"], ["literal", selectedMunicipalities]]
+        : ["==", ["get", "NAME"], "__NONE__"];
+
+      if (map.getLayer("municipality-fill")) {
+        map.setFilter("municipality-fill", filterExpression);
+      }
+      if (map.getLayer("municipality-outline")) {
+        map.setFilter("municipality-outline", filterExpression);
+      }
+    }
+
+    document.getElementById("complianceCheckbox").addEventListener("change", applyFilters);
+
+    document.getElementById("overLimitSlider").addEventListener("input", (e) => {
+      document.getElementById("overLimitValue").innerText = `${e.target.value} guests over`;
+      applyFilters();
+    });
+
+    // Reset Zoom: fit all listings into viewport
+    document.getElementById("resetZoomBtn").addEventListener("click", () => {
+      clearSpiderfy();
+      map.fitBounds(
+        [[globalMinX, globalMinY], [globalMaxX, globalMaxY]],
+        { padding: 80, duration: 900, easing: t => t * (2 - t) }
+      );
+    });
+
+    // Collapsible filter panel
+    const filterPanel = document.getElementById("filterPanel");
+    const toggleBtn = document.getElementById("toggleFiltersBtn");
+    let filtersCollapsed = false;
+
+    toggleBtn.addEventListener("click", () => {
+      filtersCollapsed = !filtersCollapsed;
+      const children = Array.from(filterPanel.children).filter(
+        el => !el.classList.contains("filter-header")
+      );
+      children.forEach(el => {
+        el.style.display = filtersCollapsed ? "none" : "";
+      });
+      toggleBtn.textContent = filtersCollapsed ? "Show" : "Hide";
+    });
+  </script>
+</body>
+</html>
